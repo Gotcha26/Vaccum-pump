@@ -6,7 +6,7 @@
 
 // Settings for initialisation
 volatile int debugMode = 9;
-String myVersion = "       v03.41.00";
+String myVersion = "       v03.42.00";
 unsigned int time_break = 10000;
 unsigned long time_now = millis();
 unsigned long time_previous = 0;
@@ -212,21 +212,21 @@ void setup() {
     lcd.setCursor(0, 1);
     lcd.print(myVersion);
   int i = frameRate * 6;
-  delay(i);
+  if (debugMode > 0) {delay(frameRate);} else {delay(i);}
 
 
   // Lecture de la pression depuis le capteur
   pressure_hpa = mpr.readPressure();
   
   // INITIALISATION
-  setLedRGB (255, 255, 0);
   lcd.clear();
   lcd.print(" INITIALISATION");
    lcd.setCursor(0, 1);
    lcd.print("****************");
-  delay(1200);
+  if (debugMode > 0) {delay(500);} else {delay(1200);}
 
   do {
+    setLedRGB (255, 255, 0);
     lcd.clear();
     lcd.print("SET low. point :");
      lcd.setCursor(0, 1);
@@ -268,6 +268,7 @@ void setup() {
 void loop() {
 
   setLedRGB (0, 255, 0);
+  bool Starting1 = 1;
 
   // Affichage de la datas
   if (debugMode >= 10) {
@@ -305,6 +306,8 @@ void loop() {
       lcd.print(lowPoint);
       lcd.print("   ");
       time_now = millis();
+      if (Starting1 == 1) {
+        time_previous = time_now + time_break;}
       if (time_now - time_previous >= time_break) {
         updateProgressBar(time_now, time_previous, 2);
         digitalWrite(LedAction, HIGH);
@@ -317,8 +320,10 @@ void loop() {
         delay(25);
       }
     }
-    else if (pressure_hpa <= lowPoint) {                                    // En attente (800hpa)
+    else if (pressure_hpa <= lowPoint) {   
+      unsigned long i = millis() - time_now;                                 // En attente (800hpa)
       time_previous = time_now;
+      Starting1 = 0;
       digitalWrite(LedAction, LOW);
       digitalWrite(RelayMoteur, LOW);
       lcd.setCursor(6, 1);
@@ -326,6 +331,9 @@ void loop() {
       lcd.print(maxPoint);
       lcd.print("   ");
       updateProgressBar(millis(), time_previous, 2);
+      Serial.print("Valeure prise par i  : ");
+      Serial.println(i);
+      //delay(1500);
     }
     delay(frameRate);                                                     // Entre les deux valeurs !
   }
