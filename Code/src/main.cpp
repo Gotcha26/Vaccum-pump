@@ -4,12 +4,15 @@
 #include <LiquidCrystal.h>
 
 
+// Settings for initialisation
+volatile int debugMode = 1;
+String myVersion = "       v03.22.00";
+
 
 // You dont *need* a reset and EOC pin for most uses, so we set to -1 and don't connect
 #define RESET_PIN  -1  // set to any GPIO pin # to hard-reset on begin()
 #define EOC_PIN    -1  // set to any GPIO pin to read end-of-conversion by pin
 Adafruit_MPRLS mpr = Adafruit_MPRLS(RESET_PIN, EOC_PIN);
-
 
 
 // Attribution des Pin;
@@ -21,11 +24,7 @@ static const uint8_t PinPotentioH = A15;
 static const uint8_t PinPotentioL = A14;
 
 
-#define LedRGB_R A0
-#define LedRGB_G A1
-#define LedRGB_B A2
-
-// Taux de rafraichissement (en msec) 
+// Taux de rafraichissement (en milli-secondes) .
 int frameRate = 500;  
 
 
@@ -35,25 +34,25 @@ int frameRate = 500;
 // La convertion est donc environ de 1000 et donne 1 bar à une pression ambiante.
 // Une dépression (exprimée en bar) est évaluée par rapport à la pression ambiante et est donc négative.
 // Une dépression (exprimée en hPa) est évaluée par rapport à la pression ambiante et est donc toujours positive.
-volatile int lowPoint;  // Point le plus  bas (low) sur l'echelle de la dépression. -0.3 bar = 700 hPa
-volatile int maxPoint;  // Point le plus haut (max) sur l'echelle de la dépression. -0.2 bar = 800 hPa
-
+volatile int lowPoint;  // Point le plus  bas (low) sur l'echelle de la dépression. -0.3 bar = 700 hPa (1 - 0.3 = 0.7 * 1000 = 700)
+volatile int maxPoint;  // Point le plus haut (max) sur l'echelle de la dépression. -0.2 bar = 800 hPa (1 - 0.2 = 0.8 * 1000 = 800)
 
 String pressure_hpa;
 float ValuePotentioH;
 float ValuePotentioL;
 
 
-// Parametre LCD ;
+// Paramètres LCD ;
 const int rs = 12, en = 11, d4 = 5, d5 = 4, d6 = 3, d7 = 2;
 LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
 const int contrastPin = 6;
 int Contrast=75;    // Contraste de 0 à 100
 
 
-
-// Settings for initialisation
-volatile int debugMode = 0;
+// LED RGB pour l'état du dispositif.
+#define LedRGB_R A0
+#define LedRGB_G A1
+#define LedRGB_B A2
 
 
 // Couleur jaune
@@ -63,61 +62,57 @@ volatile int debugMode = 0;
 // Couleur rouge
 // setLedRGB(255, 0, 0);
 void setLedRGB (int R, int G, int B) {
+
   analogWrite(LedRGB_R, R);
   analogWrite(LedRGB_G, G);
   analogWrite(LedRGB_B, B);
+
 }
 
 
 // Fonction d'interruption
 void Forced() {
+
   maxPoint = 0;
   lowPoint = 0;
   Serial.println("Je suis là !");
+
 }
 
 
 // Fonction de boucle infinie en cas de soucis
 void functionExit () {
+
   while (1) {
     setLedRGB(255, 0, 0);
     digitalWrite(LedAction, LOW);
     digitalWrite(RelayMoteur, LOW);
     delay(100);
     }
+
 }
 
 
 // Fonction pour le contrôle de présence du capteur. En cas de problème : Exit
 void functionTestSensor () {
+
   Serial.println("MPRLS Simple Test");
-  if (debugMode >= 1) {
-    lcd.begin(16, 2);
-    lcd.print("Hello");
-    delay(frameRate);
-  }
-
-
   if (! mpr.begin(0x18)) { // Adresse par défaut 0x18 pour ce capteur
-      Serial.println("Failed to communicate with MPRLS sensor, check wiring?");
-      lcd.clear();
-       lcd.setCursor(0, 1);
-       lcd.print("Error Com MPRLS");
-      functionExit();
+  Serial.println("Failed to communicate with MPRLS sensor, check wiring?");
+  lcd.clear();
+    lcd.setCursor(0, 1);
+    lcd.print("Error Com MPRLS");
+  functionExit();
   }
-  
   Serial.println("Found MPRLS sensor");
 
 }
 
 
-
 void setup() {
-
 
   // Interruption
   attachInterrupt(digitalPinToInterrupt(ButtonForcer), Forced, FALLING); // Déclenchement quand une chute vers l'état BAS.
-
 
   // Affectations
   Serial.begin(115200);
@@ -136,7 +131,14 @@ void setup() {
 
   // Test sur le capteur MPRLS
   functionTestSensor ();
-
+  if (debugMode >= 1) {
+    lcd.begin(16, 2);
+    lcd.print("  G O T C H A");
+     lcd.setCursor(0, 1);
+     lcd.print(myVersion);
+    int i = frameRate * 8;
+    delay(i);
+  }
 
   // Lecture de la pression depuis le capteur
   pressure_hpa = mpr.readPressure();
@@ -149,7 +151,6 @@ void setup() {
    lcd.setCursor(0, 1);
    lcd.print("****************");
   delay(2000);
-
 
   do {
     lcd.clear();
@@ -184,7 +185,7 @@ void setup() {
        Serial.println(String(digitalRead(ButtonValidation)));
     }
   }
-  while(digitalRead(ButtonValidation) == HIGH);
+  while (digitalRead(ButtonValidation) == HIGH);
 
 
 }
@@ -192,9 +193,7 @@ void setup() {
 
 void loop() {
 
-
   setLedRGB (0, 255, 0);
-
 
   // Affichage de la datas
   if (debugMode >= 1) {
@@ -210,17 +209,14 @@ void loop() {
   Serial.print("Valeure prise par PotentioL :");
   Serial.println(ValuePotentioL);
 
-
   Serial.print("Etat du bouton de validation : ");
   Serial.println(String(digitalRead(ButtonValidation)));
   }
-
 
   lcd.clear();
    lcd.print("LET'S STARTED !!");
   delay(2000);
   lcd.clear();
-
 
   while (1) { // Boucle infinie
     functionTestSensor (); // Test sur le capteur MPRLS
@@ -229,8 +225,6 @@ void loop() {
     lcd.print("hPa Actual: ");
     lcd.print(pressure_hpa);
     lcd.print(" "); // Efface le reste de la ligne
-
-
     if (pressure_hpa >= maxPoint) { // En fonction (800hpa)
       digitalWrite(LedAction, HIGH);
       digitalWrite(RelayMoteur, HIGH);
