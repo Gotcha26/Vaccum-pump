@@ -6,7 +6,7 @@
 
 // Settings for initialisation
 volatile int debugMode = 9;
-String myVersion = "       v03.42.00";
+String myVersion = "       v03.43.00";
 unsigned int time_break = 10000;
 unsigned long time_now = millis();
 unsigned long time_previous = 0;
@@ -269,6 +269,7 @@ void loop() {
 
   setLedRGB (0, 255, 0);
   bool Starting1 = 1;
+  bool Impulse = 0;
 
   // Affichage de la datas
   if (debugMode >= 10) {
@@ -306,34 +307,41 @@ void loop() {
       lcd.print(lowPoint);
       lcd.print("   ");
       time_now = millis();
-      if (Starting1 == 1) {
-        time_previous = time_now + time_break;}
+      if (Starting1 == 1) {time_previous = time_now + time_break;}
       if (time_now - time_previous >= time_break) {
         updateProgressBar(time_now, time_previous, 2);
         digitalWrite(LedAction, HIGH);
         digitalWrite(RelayMoteur, HIGH);
+        Impulse = 1;
       } else {
         updateProgressBar(time_now, time_previous, 2);
         digitalWrite(LedAction, HIGH);                                      // Clignotement car le moteur est en phase de repos (anti-drible).
         delay(50);
         digitalWrite(LedAction, LOW);
         delay(25);
+        Impulse = 1;
       }
     }
     else if (pressure_hpa <= lowPoint) {   
       unsigned long i = millis() - time_now;                                 // En attente (800hpa)
       time_previous = time_now;
       Starting1 = 0;
+      Impulse = 0;
       digitalWrite(LedAction, LOW);
       digitalWrite(RelayMoteur, LOW);
       lcd.setCursor(6, 1);
       lcd.print("Next: ");
       lcd.print(maxPoint);
       lcd.print("   ");
-      updateProgressBar(millis(), time_previous, 2);
+      //updateProgressBar(millis(), time_previous, 2);
       Serial.print("Valeure prise par i  : ");
       Serial.println(i);
       //delay(1500);
+    }
+    Serial.print("Valeure prise par Impulse  : ");
+    Serial.println(Impulse);
+    if (Impulse == 0) {
+      updateProgressBar(millis(), time_previous, 2);
     }
     delay(frameRate);                                                     // Entre les deux valeurs !
   }
