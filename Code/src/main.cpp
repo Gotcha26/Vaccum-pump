@@ -6,7 +6,7 @@
 
 // Settings for initialisation
 volatile int debugMode = 9;
-String myVersion = "       v03.40.00";
+String myVersion = "       v03.41.00";
 unsigned int time_break = 10000;
 unsigned long time_now = millis();
 unsigned long time_previous = 0;
@@ -305,11 +305,12 @@ void loop() {
       lcd.print(lowPoint);
       lcd.print("   ");
       time_now = millis();
-      updateProgressBar(time_now, time_previous, 2);
       if (time_now - time_previous >= time_break) {
+        updateProgressBar(time_now, time_previous, 2);
         digitalWrite(LedAction, HIGH);
         digitalWrite(RelayMoteur, HIGH);
       } else {
+        updateProgressBar(time_now, time_previous, 2);
         digitalWrite(LedAction, HIGH);                                      // Clignotement car le moteur est en phase de repos (anti-drible).
         delay(50);
         digitalWrite(LedAction, LOW);
@@ -324,8 +325,8 @@ void loop() {
       lcd.print("Next: ");
       lcd.print(maxPoint);
       lcd.print("   ");
+      updateProgressBar(millis(), time_previous, 2);
     }
     delay(frameRate);                                                     // Entre les deux valeurs !
-    updateProgressBar(millis(), time_previous, 2);
   }
 }
