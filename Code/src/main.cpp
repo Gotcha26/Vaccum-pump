@@ -29,23 +29,23 @@ Par calcul, pour une valeure de dépression de -0.175 bar (manomètrique) la pre
 
 // Settings for initialisation
 unsigned int time_break = 10000;    // Temps minimum pour empècher un redémarrage à chaux du relais. Protection anti-drible. Par défaut : 10000 ms
-int atmPressure_hpa = 1008;         // Pression atmosphérique classic. 1013 hpa. Il n'est vraiment nécessaire de modifier cette valeure.
+int atmPressure_hpa = 1008;         // Pression atmosphérique classic. 1013 hpa. Il n'est pas vraiment nécessaire de modifier cette valeure.
 int PressureL_hpa_max = 700;        // Valeure seuil la plus petite de pression absolue. Par défaut 750 hpa
 int PressureH_hpa_max = 800;        // Valeure seuil la plus grande de pression absolue. Par défaut 830 hpa
 byte uPas = 10;                     // Pas (précision) des potentiomètres. Par défaut : 10
 int frameRate = 500;                // Taux de rafraichissement (en milli-secondes) pour l'exécution du programme. Par défaut : 500 ms
 
 // Attribution des Pin;
-static const byte LedAction =  22;
-static const byte RelayMoteur = 24;
+static const byte LedAction =  52;
+static const byte RelayMoteur = 23;
 static const byte ButtonValidation = 26;
 static const byte ButtonForcer = 18;
 static const uint8_t PinPotentioH = A15;
 static const uint8_t PinPotentioL = A14;
 
 
-volatile int debugMode = 1;
-String myVersion = "       v03.55.00";
+volatile int debugMode = 0;
+String myVersion = "       v04.00.00";
 
 
 volatile int lowPoint;
