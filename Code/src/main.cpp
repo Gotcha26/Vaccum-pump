@@ -1,41 +1,4 @@
 #include <Arduino.h>
-
-
-/*!
- * @file mprls_simpletest.ino
- *
- * A basic test of the sensor with default settings
- * 
- * Designed specifically to work with the MPRLS sensor from Adafruit
- * ----> https://www.adafruit.com/products/3965
- *
- * These sensors use I2C to communicate, 2 pins (SCL+SDA) are required
- * to interface with the breakout.
- *
- * Adafruit invests time and resources providing this open source code,
- * please support Adafruit and open-source hardware by purchasing
- * products from Adafruit!
- *
- * Written by Limor Fried/Ladyada for Adafruit Industries.  
- *
- * MIT license, all text here must be included in any redistribution.
- * 
- * Code is based on the above, with added functionality for an override button,
- * and an LED indicator
- * 
- */
-
-
- /*
-  * 1 Bar = 14.61 PSI
-  * -0.25 Bar = (1-0.25) = 0.75 Bar = 10.88 PSI
-  * Sources : https://www.gflow.fr/upload/files/psi-bar.pdf and http://dominique.melotti.pagesperso-orange.fr/bar.htm
-  * 1 Bar = 1000 Hectopascals
-  * 0.75 Bar = 750 hPa
-  * Source : https://convertlive.com/fr/u/convert/barres/a/hectopascals#0.75
-  * -0.25 Bar = 850 hPa = +0.75 Bar
-  */
- 
 #include <Wire.h>
 #include <Adafruit_MPRLS.h>
 #include <LiquidCrystal.h>
@@ -47,216 +10,182 @@
 Adafruit_MPRLS mpr = Adafruit_MPRLS(RESET_PIN, EOC_PIN);
 
 
-// Pin Settings
-const int ledPin =  22;
-const int buttonPin = 13;
-const int relayPin = 26;
-const int contrastPin = 6;
-const int potentiometerPin = A15;
-const int buttonFPin = 7;
+// Definition des Pin;
+const int LedAction =  22;
+const int RelayMoteur = 24;
+const int ButtonValidation = 26;
+const int ButtonForcer = 28;
+const int PinPotentio = A15;
+const int PinPotentio2 = A14;
 
+//configuration des Seuils Mini / Maxi;
 
-// SET THE PRESSURE HERE (In absolute Bar)
-float triggerPressure = 1.01;  // In ABS - Default is 0.825 (-0.175 bar)
-float lowPoint = 0.85;         // In ABS - Default is 0.750 (-0.250 bar)
+float highPoint = -0.175;  // In ABS - Default is 0.825 (-0.175 bar)
+float lowPoint = -0.250;         // In ABS - Default is 0.750 (-0.250 bar)
+float Pression = mpr.readPressure()/1000;
 
+//Initialisation de l'etats des Bouttons;
 
-// BUTTOM
-// The button take effect between the lowPoint and the triggerPressur for restart the vacuum until the the lowPoint.
-int buttonState = 0;
-int buttonFState = 0;
-String state;
-float potentiometerValue;
+int ButtonValidation = 0;
+float Valeurpotentio;
+float Valeurpotentio2;
 
-
-// Settings for the LCD:
+// Parametre LCD ;
 const int rs = 12, en = 11, d4 = 5, d5 = 4, d6 = 3, d7 = 2;
 LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
-int Contrast=75;
+const int contrastPin = 6;
+int Contrast=75;    // Contraste de 0 à 100
 
 
 // Settings for initialisation
-int EOI = 0;
+int StateConfig = 0;
 int Stop;
 
+void Forcer()
+  {
+    Serial.print("Etat du bouton de marche forcer: ");
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print(" Marche Forcer ");
+
+      do
+        {
+          digitalWrite(LedAction, HIGH);
+          digitalWrite(RelayMoteur, HIGH);
+          lcd.setCursor(0, 1);
+          lcd.print(Pression);lcd.println(" Bar");
+        }
+      while (digitalRead(ButtonForcer==LOW));
+  }
 
 
-void setup() {
-  Serial.begin(115200);
-  analogWrite(contrastPin,Contrast);
-  Serial.println("MPRLS Simple Test");
-  lcd.begin(16, 2);
-  if (! mpr.begin()) {
-    Serial.println("Failed to communicate with MPRLS sensor, check wiring?");
-    while (1) {
+
+void setup() 
+  {
+    Serial.begin(115200);
+    analogWrite(contrastPin,Contrast);
+    Serial.println("MPRLS Simple Test");
+    lcd.begin(16, 2);
+    lcd.print("Hello");
+    if (! mpr.begin(0x18)) 
+
+      {
+
+        Serial.println("Failed to communicate with MPRLS sensor, check wiring?");
+        lcd.print("Error Com MPRLS");
+        while (1) 
+
+      {
+      
       delay(10);
     }
   }
   Serial.println("Found MPRLS sensor");
-
-
-  // initialize the LED pin as an output:
-  pinMode(ledPin, OUTPUT);
-  pinMode(relayPin, OUTPUT);
-  pinMode(buttonPin, INPUT_PULLUP);
-  pinMode(buttonFPin, INPUT_PULLUP); // Bouton est passant en PULLUP
-
-
-  // Forced work (only at the startup or after RESET)
-  buttonFState = digitalRead(buttonFPin);
-  Serial.print("Etat du bouton de marche forc�e : "); Serial.println(buttonFState);
-  if (buttonFState == 0) { // Infinite loop
-    Serial.println();
-    Serial.println("*****************");
-    Serial.println("**** WARNING ****");
-    Serial.println("*****************");
-    Serial.println();
-    while (1) {
-      float pressure_hPa = mpr.readPressure();
-      digitalWrite(ledPin, HIGH);
-      digitalWrite(relayPin, HIGH);
-      state = "on";
-      Serial.print("Pressure (hPa): "); Serial.println(String(pressure_hPa));
-      Serial.println("FORCED WORK ! BE CAREFULL !!!");
-      lcd.clear();
-      lcd.print(" NO LIMITS !!!! ");
-      lcd.setCursor(0, 1);
-      lcd.print("RESET TO STOP IT");
-      delay (1000);
-    }
-  }
-
+  lcd.print("Setup OK");
+  delay(1000);
 
 
   // INITIALISATION
   lcd.clear();
-  lcd.print(" INITIALISATION");
+  lcd.print("INITIALISATION");
   lcd.setCursor(0, 1);
   lcd.print("****************");
-  Serial.print("buttonState : "); Serial.println(String(buttonState));
-  Serial.print("potentiometerValue : "); Serial.println(analogRead(A15));
-  Serial.println();
+  //Serial.print("buttonState : "); Serial.println(String(buttonState));
+  //Serial.print("potentiometerValue : "); Serial.println(analogRead(A15));
+  //Serial.println();
   delay(2000);
 
 
+  // initialize the LED pin as an output:
+  pinMode(LedAction, OUTPUT);
+  pinMode(RelayMoteur, OUTPUT);
+  pinMode(ButtonValidation, INPUT_PULLUP);
+  pinMode(ButtonForcer, INPUT_PULLUP); // Bouton est passant en PULLUP
+  attachInterrupt(digitalPinToInterrupt(ButtonForcer), Forcer, FALLING);
+
+
+void loop() 
+{  
+  if (StateConfig == 0){Mini()};
+  Auto();     
 }
 
 
 
-void loop() {
 
-
-
-// Adjust the trigger and low points
-while (EOI != 2) { // Condition � v�rifier pour rester dans la boucle jusqu'� ce que...
-  if (EOI == 0) {
-    // Setting the Low point
-    buttonState = digitalRead(buttonPin);
-    lcd.clear();
-    lcd.print("SET low point :");
-    lcd.setCursor(0, 1);
-    potentiometerValue = (analogRead(potentiometerPin) * (-0.33/1024));
-    lcd.print(potentiometerValue); lcd.print(" bar");
-
-
-    // Condition de sortie du WHILE
-    if (buttonState == LOW) {
-      EOI = 1;
-      lowPoint = 1 + potentiometerValue;
-    }
-    Serial.print("buttonState : "); Serial.println(String(buttonState)); 
-    Serial.print("EOI : "); Serial.println(String(EOI));
-    Serial.print("lowPoint : "); Serial.print(String(lowPoint)); Serial.println(" bar (Absolut) by DEFAULT");
-    Serial.println();
-    delay(400); 
-  } else {
-    if (EOI == 1) {
-      // Settings the Trigger point
-      buttonState = digitalRead(buttonPin);
-      lcd.clear();
-      lcd.print("SET trigger pt :");
-      lcd.setCursor(0, 1);
-      potentiometerValue = (analogRead(potentiometerPin) * (-0.23/1024));
-      lcd.print(potentiometerValue); lcd.print(" bar");
-      
-      // Condition de sortie du WHILE
-      if (buttonState == LOW) {
-        EOI = 2;
-        triggerPressure = 1 + potentiometerValue;
+void Mini()
+  {
+    do
+      {
+        lcd.clear();
+        lcd.print("SET low point :");
+        lcd.setCursor(0, 1);
+        Valeurpotentio = (analogRead(PinPotentio) * (-0.33/1024));
+        lcd.print(Valeurpotentio); lcd.print(" bar");
       }
-      Serial.print("buttonState : "); Serial.println(String(buttonState)); 
-      Serial.print("EOI : "); Serial.println(String(EOI));
-      Serial.print("lowPoint : "); Serial.print(String(lowPoint)); Serial.println(" bar (Absolut) REGISTRED");
-      Serial.print("triggerPressure : "); Serial.print(String(triggerPressure)); Serial.println(" bar (Absolut) by DEFAULT");
-      Serial.println();
-      delay(400);
-    }
-  }
-}
+    while(buttonState == LOW);  
+    StateConfig=1;
+    lowPoint = 1 + Valeurpotentio;
+    Maxi();
 
-
-
-/*
-*  We're going to need to read the pressure, and then decide if we need to trigger the relay for the vacuum
-*  once we trigger the vacuum, we want to check the pressure every second until it hits the expected pressure,
-*  once it goes above the preferred pressure, it will close the relay again.
-*
-*  Beetwen the lowPoint and the triggerPressure, the vaccum system can be restarted if the "OK - RESTART" button is pressed. 
-*/
-
-
-lcd.clear();
-lcd.print("LET'S STARTED !!");
-delay(2500);
-lcd.clear();
-
-
-while (1) { // Infinite loop
-  lcd.print("Cur Bar:");
-  lcd.setCursor(0, 1);
-  lcd.print("Cur hPa:"); 
-
-
-  buttonState = digitalRead(buttonPin);
-  float pressure_hPa = mpr.readPressure();
-  Serial.print("Pressure (hPa): "); Serial.println(String(pressure_hPa));
-  float pressureBar = pressure_hPa / 1000;
-  Serial.print("Pressure (Bar): "); Serial.println(String(pressureBar));
-  Serial.print("Light is : "); Serial.println(state);
-  Serial.print("lowPoint : "); Serial.print(String(lowPoint)); Serial.println(" bar (Absolut) REGISTRED");
-  Serial.print("triggerPressure : "); Serial.print(String(triggerPressure)); Serial.println(" bar (Absolut) REGISTRED");
-  Serial.println();
-  lcd.setCursor(9, 0);
-  lcd.print(String(pressureBar));
-  lcd.setCursor(9, 1);
-  lcd.print(String(pressure_hPa));
-  if (buttonState == HIGH) {    // Normally must be true everytime
-    if (pressureBar >= triggerPressure) {
-      // Turn on the LED to indicate we're going to flip on the vacuum
-      digitalWrite(ledPin, HIGH);
-      digitalWrite(relayPin, HIGH);
-      state = "on";
-    } else if (pressureBar <= lowPoint) {
-      // Turn off the LED and relay
-      digitalWrite(ledPin, LOW);
-      digitalWrite(relayPin, LOW);
-      state = "off";
-    } /*else {
-      digitalWrite(ledPin, LOW);
-      digitalWrite(relayPin, LOW);
-      state = "off";
-    }*/
-  } else if (buttonState == HIGH) {
-    digitalWrite(ledPin, LOW);
-    digitalWrite(relayPin, LOW);
-    state = "off";
-  } else {
-    digitalWrite(ledPin, HIGH);
-    digitalWrite(relayPin, HIGH);
-    state = "on";
-  }
-  delay(1000);
   }
 
 
-}
+void Maxi()
+  {
+    do
+      {
+        lcd.clear();
+        lcd.print("SET High point :");
+        lcd.setCursor(0, 1);
+        Valeurpotentio2 = (analogRead(PinPotentio2) * (-0.33/1024));
+        lcd.print(Valeurpotentio2); lcd.print(" bar");
+      }
+    while(buttonState == LOW);  
+    StateConfig=2;
+    highPoint = 1 + Valeurpotentio2;
+
+  }
+
+
+void Auto() 
+  {
+    lcd.clear();
+    lcd.print("LET'S STARTED !!");
+    delay(2500);
+    lcd.clear();
+
+
+      while (1) 
+        { // Infinite loop
+          lcd.print("Cur Bar:");
+          lcd.setCursor(0, 1);
+          lcd.setCursor(9, 0);
+          lcd.print(String(Pression));
+
+                  //Serial.print("Pressure (hPa): "); Serial.println(String(pressure_hPa));
+                  //float pressureBar = pressure_hPa / 1000;
+                  //Serial.print("Pressure (Bar): "); Serial.println(String(pressureBar));
+                  //Serial.print("Light is : "); Serial.println(state);
+                  //Serial.print("lowPoint : "); Serial.print(String(lowPoint)); Serial.println(" bar (Absolut) REGISTRED");
+                  //Serial.print("triggerPressure : "); Serial.print(String(triggerPressure)); Serial.println(" bar (Absolut) REGISTRED");
+                  //Serial.println();
+                  
+          If (DigitalRead(ButtonForcer==LOW)) {Forcer();}
+
+          if (Pression <= highpoint)   // Turn on the LED to indicate we're going to flip on the vacuum
+            {
+              digitalWrite(LedAction, HIGH);
+              digitalWrite(RelayMoteur, HIGH);
+            }
+
+          else if (pression >= lowPoint) // Turn off the LED and relay
+            {
+              digitalWrite(LedAction, LOW);
+              digitalWrite(RelayMoteur, LOW);
+            }
+        }
+  }
+
+
+
