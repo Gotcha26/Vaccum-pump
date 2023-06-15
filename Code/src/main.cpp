@@ -5,9 +5,13 @@
 
 
 // Settings for initialisation
-volatile int debugMode = 9;
-String myVersion = "       v03.45.00";
-unsigned int time_break = 15000;
+volatile int debugMode = 0;
+String myVersion = "       v03.50.00";
+unsigned int time_break = 10000;
+
+// Taux de rafraichissement (en milli-secondes) .
+int frameRate = 500;  
+
 unsigned long time_now = millis();
 unsigned long time_previous = 0;
 
@@ -24,11 +28,7 @@ static const byte RelayMoteur = 24;
 static const byte ButtonValidation = 26;
 static const byte ButtonForcer = 18;
 static const uint8_t PinPotentioH = A15;
-static const uint8_t PinPotentioL = A14;
-
-
-// Taux de rafraichissement (en milli-secondes) .
-int frameRate = 1000;  
+static const uint8_t PinPotentioL = A14; 
 
 
 // Configuration des seuils Bas / Haut;
@@ -72,7 +72,7 @@ void setLedRGB (int R, int G, int B) {
 
 }
 
-// Bargraph
+// Bargraph vue-mètre
 // https://www.instructables.com/Simple-Progress-Bar-for-Arduino-and-LCD/
 byte zero[]   = {B00000, B00000, B00000, B00000, B00000, B00000, B00000, B00000};
 byte un[]     = {B10000, B10000, B10000, B10000, B10000, B10000, B10000, B10000};
@@ -82,7 +82,8 @@ byte quatre[] = {B11110, B11110, B11110, B11110, B11110, B11110, B11110, B11110}
 byte cinq[]   = {B11111, B11111, B11111, B11111, B11111, B11111, B11111, B11111};
 
 
-// Fonction d'interruption
+// Marche forcée.
+// Fonction d'interruption.
 void Forced() {
 
   maxPoint = 0;
@@ -92,7 +93,7 @@ void Forced() {
 }
 
 
-// Fonction de boucle infinie en cas de soucis
+// Fonction de boucle infinie en cas de soucis.
 void functionExit () {
 
   while (1) {
@@ -108,7 +109,7 @@ void functionExit () {
 // Fonction pour le contrôle de présence du capteur. En cas de problème : Exit
 void functionTestSensor () {
 
-  if (debugMode >= 9) {Serial.println("MPRLS Simple Test");}
+  if (debugMode >= 90) {Serial.println("MPRLS Simple Test");}
   if (! mpr.begin(0x18)) { // Adresse par défaut 0x18 pour ce capteur
   Serial.println("Failed to communicate with MPRLS sensor, check wiring?");
   lcd.clear();
@@ -116,7 +117,7 @@ void functionTestSensor () {
     lcd.print("Error Com MPRLS");
   functionExit();
   }
-  if (debugMode >= 9) {Serial.println("Found MPRLS sensor");}
+  if (debugMode >= 90) {Serial.println("Found MPRLS sensor");}
 
 }
 
@@ -133,7 +134,7 @@ void updateProgressBar(unsigned long a, unsigned long b, int lineToPrintOn) {
     int percent = (rest+1) / factor;
     byte number = percent/5;                         //Nombre de caractères (blocs) entiers
     int remainder = percent%5;                       //Restant, de la division par 5 sur la variable "percent".
-    if (debugMode >= 9) {
+    if (debugMode >= 10) {
       Serial.print("Valeure prise par time_now  :        ");
       Serial.println(a);
       Serial.print("Valeure prise par time_previous :    ");
@@ -205,14 +206,14 @@ void setup() {
   pinMode(ButtonValidation, INPUT_PULLUP);
   pinMode(ButtonForcer, INPUT_PULLUP); // Bouton est passant en PULLUP
 
-  // Test initial sur le capteur MPRLS + écran de démarrage.
-  functionTestSensor ();
+
+  functionTestSensor ();    // Test initial sur le capteur MPRLS + écran de démarrage.
   lcd.begin(16, 2);
   lcd.print("  GOTCHA !");
     lcd.setCursor(0, 1);
     lcd.print(myVersion);
   int i = frameRate * 6;
-  if (debugMode > 0) {delay(frameRate);} else {delay(i);}
+  if (debugMode > 0) {delay(frameRate);} else {delay(i);} //En cas de débuggage : accélaration.
 
 
   // Lecture de la pression depuis le capteur
@@ -223,7 +224,7 @@ void setup() {
   lcd.print(" INITIALISATION");
    lcd.setCursor(0, 1);
    lcd.print("****************");
-  if (debugMode > 0) {delay(500);} else {delay(1200);}
+  if (debugMode > 0) {delay(500);} else {delay(1200);} //En cas de débuggage : accélaration.
 
   do {
     setLedRGB (255, 255, 0);
@@ -234,7 +235,7 @@ void setup() {
      lcd.print(lowPoint);
      lcd.print(" hPa");
     delay(100);
-    if (debugMode >= 10) {
+    if (debugMode >= 100) {
       Serial.print("Valeure prise par lowPoint : ");
       Serial.println(lowPoint);
        Serial.print("Etat du bouton de validation : ");
@@ -252,7 +253,7 @@ void setup() {
      lcd.print(maxPoint);
      lcd.print(" hPa");
     delay(100);
-    if (debugMode >= 10) {
+    if (debugMode >= 100) {
       Serial.print("Valeure prise par maxPoint : ");
       Serial.println(lowPoint);
        Serial.print("Etat du bouton de validation : ");
@@ -261,18 +262,16 @@ void setup() {
   }
   while (digitalRead(ButtonValidation) == HIGH);
 
-
 }
 
 
 void loop() {
 
-  setLedRGB (0, 255, 0);
   bool Starting1 = 1;
   bool Impulse;
 
   // Affichage de la datas
-  if (debugMode >= 10) {
+  if (debugMode >= 100) {
   Serial.print("Pression actuelle : ");
   Serial.print(pressure_hpa);
   Serial.println(" hPa");
@@ -293,6 +292,7 @@ void loop() {
    lcd.print("LET'S STARTED !!");
   delay(2000);
   lcd.clear();
+  setLedRGB (0, 255, 0);
 
   while (1) { // Boucle infinie
     functionTestSensor (); // Test sur le capteur MPRLS
@@ -307,7 +307,7 @@ void loop() {
       lcd.print(lowPoint);
       lcd.print("   ");
       time_now = millis();
-      if (Starting1 == 1) {time_previous = time_now + time_break;}
+      if (Starting1 == 1) {time_previous = time_now + time_break;}                // Verification si le moteur peut se lancer directement ou s'il doit attendre (anti-drible).
       if (time_now - time_previous >= time_break) {
         updateProgressBar(time_now, time_previous, 2);
         digitalWrite(LedAction, HIGH);
@@ -315,7 +315,7 @@ void loop() {
         Impulse = 1;
         } else {
           updateProgressBar(time_now, time_previous, 2);
-          digitalWrite(LedAction, HIGH);                                      // Clignotement car le moteur est en phase de repos (anti-drible).
+          digitalWrite(LedAction, HIGH);                                          // Clignotement car le moteur est en phase de repos (anti-drible).
           delay(50);
           digitalWrite(LedAction, LOW);
           delay(25);
@@ -335,9 +335,10 @@ void loop() {
     if (Impulse == 0) {                                                       // Entre les deux valeurs !
       updateProgressBar(millis(), time_now, 2);
     } else {
-      Serial.println("Zone entre deux.");
+      if (debugMode >= 100) {Serial.println("Zone entre deux.");}
       time_now = millis();
-      }
+    }
     delay(frameRate);
   }
+
 }
