@@ -5,8 +5,11 @@
 
 
 // Settings for initialisation
-volatile int debugMode = 1;
+volatile int debugMode = 0;
 String myVersion = "       v03.22.00";
+#define delayDrible 10000
+u32 _millis = millis();
+u32 _umillis = 0;
 
 
 // You dont *need* a reset and EOC pin for most uses, so we set to -1 and don't connect
@@ -96,7 +99,7 @@ void functionExit () {
 // Fonction pour le contrôle de présence du capteur. En cas de problème : Exit
 void functionTestSensor () {
 
-  Serial.println("MPRLS Simple Test");
+  if (debugMode >= 9) {Serial.println("MPRLS Simple Test");}
   if (! mpr.begin(0x18)) { // Adresse par défaut 0x18 pour ce capteur
   Serial.println("Failed to communicate with MPRLS sensor, check wiring?");
   lcd.clear();
@@ -104,7 +107,7 @@ void functionTestSensor () {
     lcd.print("Error Com MPRLS");
   functionExit();
   }
-  Serial.println("Found MPRLS sensor");
+  if (debugMode >= 9) {Serial.println("Found MPRLS sensor");}
 
 }
 
@@ -129,16 +132,15 @@ void setup() {
   pinMode(ButtonValidation, INPUT_PULLUP);
   pinMode(ButtonForcer, INPUT_PULLUP); // Bouton est passant en PULLUP
 
-  // Test sur le capteur MPRLS
+  // Test initial sur le capteur MPRLS + écran de démarrage.
   functionTestSensor ();
-  if (debugMode >= 1) {
-    lcd.begin(16, 2);
-    lcd.print("  G O T C H A");
-     lcd.setCursor(0, 1);
-     lcd.print(myVersion);
-    int i = frameRate * 8;
-    delay(i);
-  }
+  lcd.begin(16, 2);
+  lcd.print("  GOTCHA !");
+    lcd.setCursor(0, 1);
+    lcd.print(myVersion);
+  int i = frameRate * 10;
+  delay(i);
+
 
   // Lecture de la pression depuis le capteur
   pressure_hpa = mpr.readPressure();
@@ -150,7 +152,7 @@ void setup() {
   lcd.print(" INITIALISATION");
    lcd.setCursor(0, 1);
    lcd.print("****************");
-  delay(2000);
+  delay(3000);
 
   do {
     lcd.clear();
@@ -160,7 +162,7 @@ void setup() {
      lcd.print(lowPoint);
      lcd.print(" hPa");
     delay(100);
-    if (debugMode >= 1) {
+    if (debugMode >= 10) {
       Serial.print("Valeure prise par lowPoint : ");
       Serial.println(lowPoint);
        Serial.print("Etat du bouton de validation : ");
@@ -178,7 +180,7 @@ void setup() {
      lcd.print(maxPoint);
      lcd.print(" hPa");
     delay(100);
-    if (debugMode >= 1) {
+    if (debugMode >= 10) {
       Serial.print("Valeure prise par maxPoint : ");
       Serial.println(lowPoint);
        Serial.print("Etat du bouton de validation : ");
@@ -196,7 +198,7 @@ void loop() {
   setLedRGB (0, 255, 0);
 
   // Affichage de la datas
-  if (debugMode >= 1) {
+  if (debugMode >= 10) {
   Serial.print("Pression actuelle : ");
   Serial.print(pressure_hpa);
   Serial.println(" hPa");
@@ -225,15 +227,31 @@ void loop() {
     lcd.print("hPa Actual: ");
     lcd.print(pressure_hpa);
     lcd.print(" "); // Efface le reste de la ligne
-    if (pressure_hpa >= maxPoint) { // En fonction (800hpa)
-      digitalWrite(LedAction, HIGH);
-      digitalWrite(RelayMoteur, HIGH);
-      lcd.setCursor(5, 1);
-      lcd.print("Next : ");
-      lcd.print(lowPoint);
-      lcd.print("   ");
+    if (pressure_hpa >= maxPoint) { // En fonction (700hpa)
+        lcd.setCursor(5, 1);
+        lcd.print("Next : ");
+        lcd.print(lowPoint);
+        lcd.print("   ");
+      if (debugMode >= 9) {
+        Serial.print("Valeure prise par _millis  : ");
+        Serial.println(_millis);
+        Serial.print("Valeure prise par _umillis : ");
+        Serial.println(_umillis);
+        delay(5000);
+      }
+      _millis = millis(); // Attribution d'un compteur temps
+      if ((_millis - _umillis) >= delayDrible) {
+        digitalWrite(LedAction, HIGH);
+        digitalWrite(RelayMoteur, HIGH);
+      } else {
+        digitalWrite(LedAction, HIGH); // Clignotement car le moteur est en phase de repos (anti-drible).
+        delay(50);
+        digitalWrite(LedAction, LOW);
+        delay(25);
+      }
     }
-    else if (pressure_hpa <= lowPoint) { // En attente (700hpa)
+    else if (pressure_hpa <= lowPoint) { // En attente (800hpa)
+      _umillis = millis();
       digitalWrite(LedAction, LOW);
       digitalWrite(RelayMoteur, LOW);
       lcd.setCursor(5, 1);
