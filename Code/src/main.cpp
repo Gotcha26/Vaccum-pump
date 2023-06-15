@@ -6,10 +6,10 @@
 
 // Settings for initialisation
 volatile int debugMode = 9;
-String myVersion = "       v03.30.10";
-unsigned int delayDrible = 10000;
-unsigned long tempoStart = millis();
-unsigned long tempoStop = 0; //LA BONNE VALEURE = 0 !!!
+String myVersion = "       v03.40.00";
+unsigned int time_break = 10000;
+unsigned long time_now = millis();
+unsigned long time_previous = 0;
 
 
 // You dont *need* a reset and EOC pin for most uses, so we set to -1 and don't connect
@@ -122,37 +122,34 @@ void functionTestSensor () {
 
 
 void updateProgressBar(unsigned long a, unsigned long b, int lineToPrintOn) {
-    double factor = delayDrible / (1.0*(5*5));        // Répartition du plein moment sur le nombre de colonnes disponnibles (5*5 = 25 colonnes)
-    unsigned long delta = (a - b);   // Temps (quantitée) à répartir.
-    int rest;                                         // Tps/Qt (-1) éfficasses
-    if (delta >= delayDrible) {
-      rest = delayDrible;
+    double factor = time_break / (1.0*(5*5));        // Répartition du plein moment sur le nombre de colonnes disponnibles (5*5 = 25 colonnes)
+    unsigned long delta = (a - b);                   // Quantité de temps à répartir.
+    int rest;                                        // Temps (normalisé)
+    if (delta >= time_break) {
+      rest = time_break;
     } else {
-      rest = delayDrible - (a - b);
+      rest = time_break - (a - b);
     }
     int percent = (rest+1) / factor;
-
-    //double factor = totalCount/(1.0*(5*5)); // 1.0 * (Nombre de caractères * Nombre de colonnes)
-    //unsigned int percent = (delayDrible - count) / factor;         // Pourcentage
-    int number = percent/5;                 //Nombre de caractères (blocs) entiers
-    int remainder = percent%5;              //Restant, de la division par 5 sur la variable "percent".
+    byte number = percent/5;                         //Nombre de caractères (blocs) entiers
+    int remainder = percent%5;                       //Restant, de la division par 5 sur la variable "percent".
     if (debugMode >= 9) {
-      Serial.print("Valeure prise par tempoStart  : ");
+      Serial.print("Valeure prise par time_now  :        ");
       Serial.println(a);
-      Serial.print("Valeure prise par tempoStop : ");
+      Serial.print("Valeure prise par time_previous :    ");
       Serial.println(b);
-      Serial.print("Valeure prise par delaydrible : ");
-      Serial.println(delayDrible);
+      Serial.print("Valeure prise par time_break :       ");
+      Serial.println(time_break);
       Serial.println("-------");
-      Serial.print("Valeure prise par delta est de : ");
+      Serial.print("Valeure prise par delta est de :     ");
       Serial.println(delta);
-      Serial.print("Valeure prise par rest est de : ");
+      Serial.print("Valeure prise par rest est de :      ");
       Serial.println(rest);
-      Serial.print("Valeure prise par factor est de : ");
+      Serial.print("Valeure prise par factor est de :    ");
       Serial.println(factor);
-      Serial.print("Valeure prise par percent est de : ");
+      Serial.print("Valeure prise par percent est de :   ");
       Serial.println(percent);
-      Serial.print("Valeure prise par number est de : ");
+      Serial.print("Valeure prise par number est de :    ");
       Serial.println(number);
       Serial.print("Valeure prise par remainder est de : ");
       Serial.println(remainder);
@@ -307,9 +304,9 @@ void loop() {
       lcd.print("Next: ");
       lcd.print(lowPoint);
       lcd.print("   ");
-      tempoStart = millis();
-      updateProgressBar(tempoStart, tempoStop, 2);
-      if (tempoStart - tempoStop >= delayDrible) {
+      time_now = millis();
+      updateProgressBar(time_now, time_previous, 2);
+      if (time_now - time_previous >= time_break) {
         digitalWrite(LedAction, HIGH);
         digitalWrite(RelayMoteur, HIGH);
       } else {
@@ -320,17 +317,15 @@ void loop() {
       }
     }
     else if (pressure_hpa <= lowPoint) {                                    // En attente (800hpa)
-      tempoStop = millis();
+      time_previous = time_now;
       digitalWrite(LedAction, LOW);
       digitalWrite(RelayMoteur, LOW);
       lcd.setCursor(6, 1);
       lcd.print("Next: ");
       lcd.print(maxPoint);
       lcd.print("   ");
-      updateProgressBar(millis(), tempoStart, 2);
     }
-                                                                          // Entre les deux valeurs !
-    delay(frameRate);
-    //updateProgressBar(tempoStart, tempoStop, 2);
+    delay(frameRate);                                                     // Entre les deux valeurs !
+    updateProgressBar(millis(), time_previous, 2);
   }
 }
