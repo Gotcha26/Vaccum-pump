@@ -21,8 +21,33 @@ Aussi, une pression négative (communément dénommée "dépression"), sera l'ex
 Par calcul, pour une valeure de dépression de -0.250 bar (manomètrique) la pression ABSOLUE correspondante vaudra :
 1.01325 - 0.250 = 0.76325 bar ou encore 763.25 hpa.
 Par calcul, pour une valeure de dépression de -0.175 bar (manomètrique) la pression ABSOLUE correspondante vaudra :
-1.01325 - 0.175 = 0.83825 bar ou encore 838.25 hpa.   
+1.01325 - 0.175 = 0.83825 bar ou encore 838.25 hpa.
 
+
+*********************************************************************************************************************************************************
+|                                                            Initialisation Pression ABSOLUE                                                            |
+*********************************************************************************************************************************************************
+
+S'IL VOUS PLAIT, cette section ne s'adresse QUE et UNIQUEMENT SI vous désirez travailler en exprimant vos valeures de pression en ABSOLUE (hPa).
+Si ce n'est pas le cas, MERCI DE BIEN VOULOIR LAISSER LES VARIABLES CI-APRES **A ZERO** !!!
+*/
+unsigned int PressureL_hpa_max = 0;        // Valeure seuil la plus petite de pression absolue. Par défaut 750 hpa
+unsigned int PressureH_hpa_max = 0;        // Valeure seuil la plus grande de pression absolue. Par défaut 830 hpa
+
+
+/*
+*********************************************************************************************************************************************************
+|                                                         Initialisation Pression MANOMETRIQUE                                                          |
+*********************************************************************************************************************************************************
+
+S'IL VOUS PLAIT, cette section ne s'adresse QUE et UNIQUEMENT SI vous désirez travailler en exprimant vos valeures de pression en MANOMETRIQUE (bar).
+Les valeures accéptés vont de 0.000 (zéro) à -1.000 (moins un). Les décimales sont a prendre en compte.
+Si ce n'est pas le cas, MERCI DE BIEN VOULOIR LAISSER LES VARIABLES CI-APRES **A ZERO** !!!
+*/
+float PressureL_bar_max = -0.250;        // Valeure seuil la plus petite de pression manométrique. Par défaut -0.250 bar
+float PressureH_bar_max = -0.170;        // Valeure seuil la plus grande de pression manométrique. Par défaut -0.170 bar
+
+/*
 *********************************************************************************************************************************************************
 */
 
@@ -30,10 +55,12 @@ Par calcul, pour une valeure de dépression de -0.175 bar (manomètrique) la pre
 // Settings for initialisation
 unsigned int time_break = 10000;    // Temps minimum pour empècher un redémarrage à chaux du relais. Protection anti-drible. Par défaut : 10000 ms
 int atmPressure_hpa = 1008;         // Pression atmosphérique classic. 1013 hpa. Il n'est pas vraiment nécessaire de modifier cette valeure.
-int PressureL_hpa_max = 700;        // Valeure seuil la plus petite de pression absolue. Par défaut 750 hpa
-int PressureH_hpa_max = 800;        // Valeure seuil la plus grande de pression absolue. Par défaut 830 hpa
+float atmPressure_bar = 1.01;         // Pression atmosphérique classic. 1.01 bar. Il n'est pas vraiment nécessaire de modifier cette valeure.
 byte uPas = 10;                     // Pas (précision) des potentiomètres. Par défaut : 10
 int frameRate = 500;                // Taux de rafraichissement (en milli-secondes) pour l'exécution du programme. Par défaut : 500 ms
+
+volatile int debugMode = 1;         // Mode de débuggage
+String myVersion = "v04.00.10";     // Version
 
 // Attribution des Pin;
 static const byte LedAction =  52;
@@ -44,14 +71,12 @@ static const uint8_t PinPotentioH = A15;
 static const uint8_t PinPotentioL = A14;
 
 
-volatile int debugMode = 0;
-String myVersion = "       v04.00.00";
-
-
 volatile int lowPoint;
 volatile int maxPoint;
 
 String pressure_hpa;
+float pressure_bar;
+String Unite;
 float ValuePotentioH;
 float ValuePotentioL;
 
@@ -240,7 +265,7 @@ void setup() {
   functionTestSensor ();    //Test initial sur le capteur MPRLS + écran de démarrage.
   lcd.begin(16, 2);
   lcd.print("  GOTCHA !");
-    lcd.setCursor(0, 1);
+    lcd.setCursor(7, 1);
     lcd.print(myVersion);
   int i = frameRate * 6;
   if (debugMode > 0) {delay(frameRate);} else {delay(i);} //En cas de débuggage : accélaration.
@@ -248,6 +273,20 @@ void setup() {
 
   // Lecture de la pression depuis le capteur
   pressure_hpa = mpr.readPressure();
+  pressure_bar = mpr.readPressure() / 1000;
+
+  // Test pour une conversion hPa => bar
+  if (PressureL_bar_max !=PressureH_bar_max) {
+    Serial.println("N'est pas égal. Choix en pression MANOMETRIQUE (bar).");
+    PressureL_hpa_max = (atmPressure_bar + PressureL_bar_max) * 1000;
+    PressureH_hpa_max = (atmPressure_bar + PressureH_bar_max) * 1000;
+    Serial.println(PressureL_hpa_max);
+    Serial.println(PressureH_hpa_max);
+    Unite = "bar";
+  } else {
+    Serial.print("Est égal. Choix pression ABSOLUE (hpa).");
+    Unite = "hpa";
+  }
 
   
   // INITIALISATION
