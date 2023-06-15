@@ -1,3 +1,13 @@
+// ToDo list
+// Led RGB pour les états du dispositif
+// Boucler le test du capteur (COM ok vs NOK)
+// Précision sur la dixaine uniquement pour les potentiomètres
+// Inverser le sens d'encodage des potentiomètres
+// Ajouter un symbale en tête de ligne #2 dans loop pour indiquer ce que doit faire la pression (up/down)
+
+// Inspiré de : https://gitlab.com/pleasurepi/vacbedcontrol @halon1301 sur Twitter
+
+
 #include <Arduino.h>
 #include <Wire.h>
 #include <Adafruit_MPRLS.h>
@@ -29,7 +39,6 @@ volatile int lowPoint;  // Point le plus  bas (low) sur l'echelle de la dépress
 volatile int maxPoint;  // Point le plus haut (max) sur l'echelle de la dépression. -0.2 bar = 800 hPa
 
 String pressure_hpa;
-
 float ValuePotentioH;
 float ValuePotentioL;
 
@@ -43,19 +52,26 @@ int Contrast=75;    // Contraste de 0 à 100
 // Settings for initialisation
 int debugMode = 1;
 
+// Fonction d'interruption
 void Forced() {
   maxPoint = 0;
   lowPoint = 0;
   Serial.println("Je suis là !");
-  lcd.clear();
+}
+
+// Fonction de boucle infinie en cas de soucis
+void functionExit () {
+  while (1) {
+    digitalWrite(LedTest, LOW);
+    delay(100);
+    }
 }
 
 
 void setup() {
-  
-  // Interruption
-  attachInterrupt(digitalPinToInterrupt(ButtonForcer), Forced, FALLING); // Déclenchement quand une chute vers l'état BAS.
 
+  // Affectations
+  digitalWrite(LedTest, HIGH);
   Serial.begin(115200);
   analogWrite(contrastPin,Contrast);
   pinMode(LedTest, OUTPUT);
@@ -64,6 +80,9 @@ void setup() {
   pinMode(ButtonValidation, INPUT_PULLUP);
   pinMode(ButtonForcer, INPUT_PULLUP); // Bouton est passant en PULLUP
 
+  // Interruption
+  attachInterrupt(digitalPinToInterrupt(ButtonForcer), Forced, FALLING); // Déclenchement quand une chute vers l'état BAS.
+
   // Check the MPRLS sensor
   Serial.println("MPRLS Simple Test");
   lcd.begin(16, 2);
@@ -71,14 +90,15 @@ void setup() {
 
   if (! mpr.begin(0x18)) { // Adresse par défaut 0x18 pour ce capteur
       Serial.println("Failed to communicate with MPRLS sensor, check wiring?");
-      lcd.setCursor(0, 1);
-      lcd.print("Error Com MPRLS");
-      // fonctionExit();
+      lcd.clear();
+       lcd.setCursor(0, 1);
+       lcd.print("Error Com MPRLS");
+      functionExit();
   }
   
   Serial.println("Found MPRLS sensor");
   lcd.setCursor(0, 1);
-   lcd.print("Setup OK");
+  lcd.print("Setup OK");
   delay(500);
 
   // Lecture de la pression depus le capteur
@@ -87,23 +107,23 @@ void setup() {
   // INITIALISATION
   lcd.clear();
   lcd.print(" INITIALISATION");
-  lcd.setCursor(0, 1);
-  lcd.print("****************");
+   lcd.setCursor(0, 1);
+   lcd.print("****************");
   delay(2000);
 
   do {
     lcd.clear();
     lcd.print("SET low. point :");
-    lcd.setCursor(0, 1);
-    lowPoint = ((int)analogRead(PinPotentioL));
-    lcd.print(lowPoint);
+     lcd.setCursor(0, 1);
+     lowPoint = ((int)analogRead(PinPotentioL));
+     lcd.print(lowPoint);
      lcd.print(" hPa");
     delay(100);
     if (debugMode > 0) {
       Serial.print("Valeure prise par lowPoint : ");
-        Serial.println(lowPoint);
-      Serial.print("Etat du bouton de validation : ");
-      Serial.println(String(digitalRead(ButtonValidation)));
+      Serial.println(lowPoint);
+       Serial.print("Etat du bouton de validation : ");
+       Serial.println(String(digitalRead(ButtonValidation)));
     }
   }
   while (digitalRead(ButtonValidation) == HIGH);
@@ -112,16 +132,16 @@ void setup() {
   do {
     lcd.clear();
     lcd.print("SET max. point :");
-    lcd.setCursor(0, 1);
-    maxPoint = ((int)analogRead(PinPotentioH));
-    lcd.print(maxPoint);
+     lcd.setCursor(0, 1);
+     maxPoint = ((int)analogRead(PinPotentioH));
+     lcd.print(maxPoint);
      lcd.print(" hPa");
     delay(100);
     if (debugMode > 0) {
       Serial.print("Valeure prise par maxPoint : ");
-        Serial.println(lowPoint);
-      Serial.print("Etat du bouton de validation : ");
-      Serial.println(String(digitalRead(ButtonValidation)));
+      Serial.println(lowPoint);
+       Serial.print("Etat du bouton de validation : ");
+       Serial.println(String(digitalRead(ButtonValidation)));
     }
   }
   while(digitalRead(ButtonValidation) == HIGH);
@@ -133,21 +153,19 @@ void loop() {
   // Affichage de la datas
   if (debugMode > 0) {
   Serial.print("Pression actuelle : ");
-   Serial.print(pressure_hpa);
-    Serial.println(" hPa");
+  Serial.print(pressure_hpa);
+  Serial.println(" hPa");
   
   ValuePotentioH = (analogRead(PinPotentioH));
   Serial.print("Valeure prise par PotentioH :");
-   Serial.println(ValuePotentioH);
+  Serial.println(ValuePotentioH);
   
   ValuePotentioL = (analogRead(PinPotentioL));
   Serial.print("Valeure prise par PotentioL :");
-   Serial.println(ValuePotentioL);
-  
-  digitalWrite(LedTest, HIGH);
+  Serial.println(ValuePotentioL);
 
   Serial.print("Etat du bouton de validation : ");
-   Serial.println(String(digitalRead(ButtonValidation)));
+  Serial.println(String(digitalRead(ButtonValidation)));
   }
 
   lcd.clear();
@@ -158,24 +176,26 @@ void loop() {
   while (1) { // Boucle infinie
     int pressure_hpa = mpr.readPressure();
     lcd.setCursor(0, 0);
-     lcd.print("hPa Actual: ");
-      lcd.print(pressure_hpa);
-       lcd.print(" ");
+    lcd.print("hPa Actual: ");
+    lcd.print(pressure_hpa);
+    lcd.print(" "); // Efface le reste de la ligne
 
-    if (pressure_hpa >= maxPoint) { // Turn on the LED to indicate we're going to flip on the vacuum
+    if (pressure_hpa >= maxPoint) { // En fonction
       digitalWrite(LedAction, HIGH);
       digitalWrite(RelayMoteur, HIGH);
       lcd.setCursor(5, 1);
       lcd.print("Next : ");
-       lcd.print(lowPoint);
+      lcd.print(lowPoint);
+      lcd.print("   ");
       delay(300);
     }
-    else if (pressure_hpa <= lowPoint) { // Turn off the LED and relay
+    else if (pressure_hpa <= lowPoint) { // En attente
       digitalWrite(LedAction, LOW);
       digitalWrite(RelayMoteur, LOW);
       lcd.setCursor(5, 1);
       lcd.print("Next : ");
-       lcd.print(maxPoint);
+      lcd.print(maxPoint);
+      lcd.print("   ");
       delay(300);
     }
   }
