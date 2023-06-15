@@ -78,39 +78,15 @@ void Forced() {
 void functionExit () {
   while (1) {
     setLedRGB(255, 0, 0);
+    digitalWrite(LedAction, LOW);
+    digitalWrite(RelayMoteur, LOW);
     delay(100);
     }
 }
 
 
-
-void setup() {
-
-
-  // Affectations
-  Serial.begin(115200);
-  analogWrite(contrastPin,Contrast);
-
-
-  pinMode(LedRGB_R, OUTPUT);
-  pinMode(LedRGB_G, OUTPUT);
-  pinMode(LedRGB_B, OUTPUT);
-
-
-  setLedRGB(0, 0, 255);
-
-
-  pinMode(LedAction, OUTPUT);
-  pinMode(RelayMoteur, OUTPUT);
-  pinMode(ButtonValidation, INPUT_PULLUP);
-  pinMode(ButtonForcer, INPUT_PULLUP); // Bouton est passant en PULLUP
-
-
-  // Interruption
-  attachInterrupt(digitalPinToInterrupt(ButtonForcer), Forced, FALLING); // Déclenchement quand une chute vers l'état BAS.
-
-
-  // Check the MPRLS sensor
+// Fonction pour le contrôle de présence du capteur. En cas de problème : Exit
+void functionTestSensor () {
   Serial.println("MPRLS Simple Test");
   lcd.begin(16, 2);
   lcd.print("Hello");
@@ -125,12 +101,38 @@ void setup() {
   }
   
   Serial.println("Found MPRLS sensor");
-  lcd.setCursor(0, 1);
-  lcd.print("Setup OK");
-  delay(500);
+
+}
 
 
-  // Lecture de la pression depus le capteur
+
+void setup() {
+
+
+  // Interruption
+  attachInterrupt(digitalPinToInterrupt(ButtonForcer), Forced, FALLING); // Déclenchement quand une chute vers l'état BAS.
+
+
+  // Affectations
+  Serial.begin(115200);
+  analogWrite(contrastPin,Contrast);
+
+  pinMode(LedRGB_R, OUTPUT);
+  pinMode(LedRGB_G, OUTPUT);
+  pinMode(LedRGB_B, OUTPUT);
+
+  setLedRGB(0, 0, 255);
+
+  pinMode(LedAction, OUTPUT);
+  pinMode(RelayMoteur, OUTPUT);
+  pinMode(ButtonValidation, INPUT_PULLUP);
+  pinMode(ButtonForcer, INPUT_PULLUP); // Bouton est passant en PULLUP
+
+  // Test sur le capteur MPRLS
+  functionTestSensor ();
+
+
+  // Lecture de la pression depuis le capteur
   pressure_hpa = mpr.readPressure();
   
   // INITIALISATION
@@ -214,6 +216,7 @@ void loop() {
 
 
   while (1) { // Boucle infinie
+    functionTestSensor (); // Test sur le capteur MPRLS
     int pressure_hpa = mpr.readPressure();
     lcd.setCursor(0, 0);
     lcd.print("hPa Actual: ");
