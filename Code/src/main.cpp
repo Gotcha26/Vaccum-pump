@@ -322,8 +322,8 @@ void loop() {
         Impulse = 1;
       }
     }
-    else if (pressure_hpa <= lowPoint) {   
-      unsigned long i = millis() - time_now;                                 // En attente (800hpa)
+    else if (pressure_hpa <= lowPoint) {                                    // En attente (800hpa)  
+      //unsigned long i = millis() - time_now;
       time_previous = time_now;
       Starting1 = 0;
       Impulse = 0;
@@ -334,14 +334,15 @@ void loop() {
       lcd.print(maxPoint);
       lcd.print("   ");
       //updateProgressBar(millis(), time_previous, 2);
-      Serial.print("Valeure prise par i  : ");
-      Serial.println(i);
-      //delay(1500);
     }
+    unsigned long i = millis() - time_now;
     Serial.print("Valeure prise par Impulse  : ");
     Serial.println(Impulse);
+    Serial.print("Valeure prise par i  : ");
+    Serial.println(i);
+    
     if (Impulse == 0) {
-      updateProgressBar(millis(), time_previous, 2);
+      updateProgressBar(millis(), time_now, 2);
     }
     delay(frameRate);                                                     // Entre les deux valeurs !
   }
