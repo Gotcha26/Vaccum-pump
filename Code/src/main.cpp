@@ -6,8 +6,8 @@
 
 // Settings for initialisation
 volatile int debugMode = 9;
-String myVersion = "       v03.43.00";
-unsigned int time_break = 10000;
+String myVersion = "       v03.45.00";
+unsigned int time_break = 15000;
 unsigned long time_now = millis();
 unsigned long time_previous = 0;
 
@@ -28,7 +28,7 @@ static const uint8_t PinPotentioL = A14;
 
 
 // Taux de rafraichissement (en milli-secondes) .
-int frameRate = 500;  
+int frameRate = 1000;  
 
 
 // Configuration des seuils Bas / Haut;
@@ -269,7 +269,7 @@ void loop() {
 
   setLedRGB (0, 255, 0);
   bool Starting1 = 1;
-  bool Impulse = 0;
+  bool Impulse;
 
   // Affichage de la datas
   if (debugMode >= 10) {
@@ -313,37 +313,31 @@ void loop() {
         digitalWrite(LedAction, HIGH);
         digitalWrite(RelayMoteur, HIGH);
         Impulse = 1;
-      } else {
-        updateProgressBar(time_now, time_previous, 2);
-        digitalWrite(LedAction, HIGH);                                      // Clignotement car le moteur est en phase de repos (anti-drible).
-        delay(50);
-        digitalWrite(LedAction, LOW);
-        delay(25);
-        Impulse = 1;
+        } else {
+          updateProgressBar(time_now, time_previous, 2);
+          digitalWrite(LedAction, HIGH);                                      // Clignotement car le moteur est en phase de repos (anti-drible).
+          delay(50);
+          digitalWrite(LedAction, LOW);
+          delay(25);
+          Impulse = 1;
       }
-    }
-    else if (pressure_hpa <= lowPoint) {                                    // En attente (800hpa)  
-      //unsigned long i = millis() - time_now;
-      time_previous = time_now;
-      Starting1 = 0;
-      Impulse = 0;
-      digitalWrite(LedAction, LOW);
-      digitalWrite(RelayMoteur, LOW);
-      lcd.setCursor(6, 1);
-      lcd.print("Next: ");
-      lcd.print(maxPoint);
-      lcd.print("   ");
-      //updateProgressBar(millis(), time_previous, 2);
-    }
-    unsigned long i = millis() - time_now;
-    Serial.print("Valeure prise par Impulse  : ");
-    Serial.println(Impulse);
-    Serial.print("Valeure prise par i  : ");
-    Serial.println(i);
-    
-    if (Impulse == 0) {
+    } else if (pressure_hpa <= lowPoint) {                                    // En attente (800hpa)  
+        time_previous = time_now;
+        Starting1 = 0;
+        Impulse = 0;
+        digitalWrite(LedAction, LOW);
+        digitalWrite(RelayMoteur, LOW);
+        lcd.setCursor(6, 1);
+        lcd.print("Next: ");
+        lcd.print(maxPoint);
+        lcd.print("   ");
+    }  
+    if (Impulse == 0) {                                                       // Entre les deux valeurs !
       updateProgressBar(millis(), time_now, 2);
-    }
-    delay(frameRate);                                                     // Entre les deux valeurs !
+    } else {
+      Serial.println("Zone entre deux.");
+      time_now = millis();
+      }
+    delay(frameRate);
   }
 }
