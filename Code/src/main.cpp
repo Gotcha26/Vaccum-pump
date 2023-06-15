@@ -25,6 +25,9 @@ static const uint8_t PinPotentioL = A14;
 #define LedRGB_G A1
 #define LedRGB_B A2
 
+// Taux de rafraichissement (en msec) 
+int frameRate = 500;  
+
 
 // Configuration des seuils Bas / Haut;
 // Les pressions sont données en BAR (bar) donc une pression relative par rapport à la pression ambiante.
@@ -91,7 +94,7 @@ void functionTestSensor () {
   if (debugMode >= 1) {
     lcd.begin(16, 2);
     lcd.print("Hello");
-    delay(500);
+    delay(frameRate);
   }
 
 
@@ -228,23 +231,22 @@ void loop() {
     lcd.print(" "); // Efface le reste de la ligne
 
 
-    if (pressure_hpa >= maxPoint) { // En fonction
+    if (pressure_hpa >= maxPoint) { // En fonction (800hpa)
       digitalWrite(LedAction, HIGH);
       digitalWrite(RelayMoteur, HIGH);
       lcd.setCursor(5, 1);
       lcd.print("Next : ");
       lcd.print(lowPoint);
       lcd.print("   ");
-      delay(300);
     }
-    else if (pressure_hpa <= lowPoint) { // En attente
+    else if (pressure_hpa <= lowPoint) { // En attente (700hpa)
       digitalWrite(LedAction, LOW);
       digitalWrite(RelayMoteur, LOW);
       lcd.setCursor(5, 1);
       lcd.print("Next : ");
       lcd.print(maxPoint);
       lcd.print("   ");
-      delay(300);
     }
+    delay(frameRate);
   }
 }
