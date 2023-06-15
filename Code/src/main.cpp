@@ -50,7 +50,7 @@ int Contrast=75;    // Contraste de 0 à 100
 
 
 // Settings for initialisation
-int debugMode = 1;
+volatile int debugMode = 0;
 
 
 // Couleur jaune
@@ -88,8 +88,11 @@ void functionExit () {
 // Fonction pour le contrôle de présence du capteur. En cas de problème : Exit
 void functionTestSensor () {
   Serial.println("MPRLS Simple Test");
-  lcd.begin(16, 2);
-  lcd.print("Hello");
+  if (debugMode >= 1) {
+    lcd.begin(16, 2);
+    lcd.print("Hello");
+    delay(500);
+  }
 
 
   if (! mpr.begin(0x18)) { // Adresse par défaut 0x18 pour ce capteur
@@ -115,7 +118,7 @@ void setup() {
 
   // Affectations
   Serial.begin(115200);
-  analogWrite(contrastPin,Contrast);
+  analogWrite(contrastPin, Contrast);
 
   pinMode(LedRGB_R, OUTPUT);
   pinMode(LedRGB_G, OUTPUT);
@@ -138,6 +141,7 @@ void setup() {
   // INITIALISATION
   setLedRGB (255, 255, 0);
   lcd.clear();
+  lcd.begin(16, 2);
   lcd.print(" INITIALISATION");
    lcd.setCursor(0, 1);
    lcd.print("****************");
@@ -148,11 +152,11 @@ void setup() {
     lcd.clear();
     lcd.print("SET low. point :");
      lcd.setCursor(0, 1);
-     lowPoint = ((int)analogRead(PinPotentioL));
+     lowPoint = (int(analogRead(PinPotentioL))/10)*10;
      lcd.print(lowPoint);
      lcd.print(" hPa");
     delay(100);
-    if (debugMode > 0) {
+    if (debugMode >= 1) {
       Serial.print("Valeure prise par lowPoint : ");
       Serial.println(lowPoint);
        Serial.print("Etat du bouton de validation : ");
@@ -166,11 +170,11 @@ void setup() {
     lcd.clear();
     lcd.print("SET max. point :");
      lcd.setCursor(0, 1);
-     maxPoint = ((int)analogRead(PinPotentioH));
+     maxPoint = (int(analogRead(PinPotentioH))/10)*10;
      lcd.print(maxPoint);
      lcd.print(" hPa");
     delay(100);
-    if (debugMode > 0) {
+    if (debugMode >= 1) {
       Serial.print("Valeure prise par maxPoint : ");
       Serial.println(lowPoint);
        Serial.print("Etat du bouton de validation : ");
@@ -190,7 +194,7 @@ void loop() {
 
 
   // Affichage de la datas
-  if (debugMode > 0) {
+  if (debugMode >= 1) {
   Serial.print("Pression actuelle : ");
   Serial.print(pressure_hpa);
   Serial.println(" hPa");
