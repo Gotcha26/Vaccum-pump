@@ -3,29 +3,37 @@
 #include <Adafruit_MPRLS.h>
 #include <LiquidCrystal.h>
 
+/*
+*********************************************************************************************************************************************************
+|                                                   Différence entre pression ABSOLUE et MANOMÉTRIQUE                                                   |
+*********************************************************************************************************************************************************
+
+Par convention internationnale, la mesure de la pression doit se faire de manière ABSOLUE et est exprimée en Hecto Pascal (hPa).
+Donc ce chiffre sera compris entre 0 (zéro) et +∞ (infini).
+Plus d'informations : https://www.thermal-engineering.org/fr/quest-ce-que-la-pression-absolue-definition/
+
+La pression MANOMÉTRIQUE (appelée aussi "pression de jauge") n'est autre d'une mesure __relative__ en fonction de l'environement ouvert où se trouve
+l'appreil (jauge) de mesure.
+Cette pression relative sera donc souvent exprimée en barre (bar) où la différence est faite en fonction de la pression atmosphérique.
+Cette pression relative sera donc positive ou négative. Au niveau de la mer (0m d'altitude) cette pression vaut 1013.25 hpa (soit 1,01325 bar).
+
+Aussi, une pression négative (communément dénommée "dépression"), sera l'expression de cette différence de pression entre 2 points.
+Par calcul, pour une valeure de dépression de -0.250 bar (manomètrique) la pression ABSOLUE correspondante vaudra :
+1.01325 - 0.250 = 0.76325 bar ou encore 763.25 hpa.
+Par calcul, pour une valeure de dépression de -0.175 bar (manomètrique) la pression ABSOLUE correspondante vaudra :
+1.01325 - 0.175 = 0.83825 bar ou encore 838.25 hpa.   
+
+*********************************************************************************************************************************************************
+*/
+
 
 // Settings for initialisation
-volatile int debugMode = 1;
-String myVersion = "       v03.54.00";
-unsigned int time_break = 10000;
-int PotentioL_min = 1024;
-int PotentioL_max = 700;
-int PotentioH_min = 1024;
-int PotentioH_max = 800;
-byte uPas = 10; //Pas (précision) des potentiomètres. Normalement un pas de 10 est largement siffisant. Sinon, 1.
-
-// Taux de rafraichissement (en milli-secondes) .
-int frameRate = 500;  
-
-unsigned long time_now = millis();
-unsigned long time_previous = 0;
-
-
-// You dont *need* a reset and EOC pin for most uses, so we set to -1 and don't connect
-#define RESET_PIN  -1  // set to any GPIO pin # to hard-reset on begin()
-#define EOC_PIN    -1  // set to any GPIO pin to read end-of-conversion by pin
-Adafruit_MPRLS mpr = Adafruit_MPRLS(RESET_PIN, EOC_PIN);
-
+unsigned int time_break = 10000;    // Temps minimum pour empècher un redémarrage à chaux du relais. Protection anti-drible. Par défaut : 10000 ms
+int atmPressure_hpa = 1008;         // Pression atmosphérique classic. 1013 hpa. Il n'est vraiment nécessaire de modifier cette valeure.
+int PressureL_hpa_max = 700;        // Valeure seuil la plus petite de pression absolue. Par défaut 750 hpa
+int PressureH_hpa_max = 800;        // Valeure seuil la plus grande de pression absolue. Par défaut 830 hpa
+byte uPas = 10;                     // Pas (précision) des potentiomètres. Par défaut : 10
+int frameRate = 500;                // Taux de rafraichissement (en milli-secondes) pour l'exécution du programme. Par défaut : 500 ms
 
 // Attribution des Pin;
 static const byte LedAction =  22;
@@ -33,17 +41,15 @@ static const byte RelayMoteur = 24;
 static const byte ButtonValidation = 26;
 static const byte ButtonForcer = 18;
 static const uint8_t PinPotentioH = A15;
-static const uint8_t PinPotentioL = A14; 
+static const uint8_t PinPotentioL = A14;
 
 
-// Configuration des seuils Bas / Haut;
-// Les pressions sont données en BAR (bar) donc une pression relative par rapport à la pression ambiante.
-// Cette pression ambiante est exprimée en Hecto Pascal (hPa) est vaut 1010 hPa environ.
-// La convertion est donc environ de 1000 et donne 1 bar à une pression ambiante.
-// Une dépression (exprimée en bar) est évaluée par rapport à la pression ambiante et est donc négative.
-// Une dépression (exprimée en hPa) est évaluée par rapport à la pression ambiante et est donc toujours positive.
-volatile int lowPoint;  // Point le plus  bas (low) sur l'echelle de la dépression. -0.3 bar = 700 hPa (1 - 0.3 = 0.7 * 1000 = 700)
-volatile int maxPoint;  // Point le plus haut (max) sur l'echelle de la dépression. -0.2 bar = 800 hPa (1 - 0.2 = 0.8 * 1000 = 800)
+volatile int debugMode = 1;
+String myVersion = "       v03.55.00";
+
+
+volatile int lowPoint;
+volatile int maxPoint;
 
 String pressure_hpa;
 float ValuePotentioH;
@@ -78,13 +84,16 @@ void setLedRGB (int R, int G, int B) {
 }
 
 // Bargraph vue-mètre
+unsigned long time_now = millis();
+unsigned long time_previous = 0;
+
 // https://www.instructables.com/Simple-Progress-Bar-for-Arduino-and-LCD/
 byte zero[]   = {B00000, B00000, B00000, B00000, B00000, B00000, B00000, B00000};
-byte un[]     = {B10000, B10000, B10000, B10000, B10000, B10000, B10000, B10000};
-byte deux[]   = {B11000, B11000, B11000, B11000, B11000, B11000, B11000, B11000};
-byte trois[]  = {B11100, B11100, B11100, B11100, B11100, B11100, B11100, B11100};
-byte quatre[] = {B11110, B11110, B11110, B11110, B11110, B11110, B11110, B11110};
-byte cinq[]   = {B11111, B11111, B11111, B11111, B11111, B11111, B11111, B11111};
+byte one[]     = {B10000, B10000, B10000, B10000, B10000, B10000, B10000, B10000};
+byte two[]   = {B11000, B11000, B11000, B11000, B11000, B11000, B11000, B11000};
+byte three[]  = {B11100, B11100, B11100, B11100, B11100, B11100, B11100, B11100};
+byte four[] = {B11110, B11110, B11110, B11110, B11110, B11110, B11110, B11110};
+byte five[]   = {B11111, B11111, B11111, B11111, B11111, B11111, B11111, B11111};
 
 
 // Marche forcée.
@@ -112,6 +121,11 @@ void functionExit () {
 
 
 // Fonction pour le contrôle de présence du capteur. En cas de problème : Exit
+// Vous n'avez pas *besoin* des pin reset ni EOC pour la plupart des usages, donc nous les déclarons à -1 et omettons de les connecter.
+#define RESET_PIN  -1  // set to any GPIO pin # to hard-reset on begin()
+#define EOC_PIN    -1  // set to any GPIO pin to read end-of-conversion by pin
+Adafruit_MPRLS mpr = Adafruit_MPRLS(RESET_PIN, EOC_PIN);
+
 void functionTestSensor () {
 
   if (debugMode >= 90) {Serial.println("MPRLS Simple Test");}
@@ -139,7 +153,7 @@ void updateProgressBar(unsigned long a, unsigned long b, int lineToPrintOn) {
     }
     int percent = (rest+1) / factor;
     byte number = percent/5;                         //Nombre de caractères (blocs) entiers
-    int remainder = percent%5;                       //Restant, de la division par 5 sur la variable "percent".
+    int remainder = percent%5;                       //Restant (pouillèmes) de la division par 5 sur la variable "percent". https://www.lalanguefrancaise.com/dictionnaire/definition/pouilleme
     if (debugMode >= 10) {
       Serial.print("Valeure prise par time_now  :        ");
       Serial.println(a);
@@ -184,10 +198,9 @@ void updateProgressBar(unsigned long a, unsigned long b, int lineToPrintOn) {
  }
 
 
-// Fonction de normalisation pour les potentiomètres avec un mini/maxi ainsi qu'une précision au dixiaime seulement.
-// Ajout de +10 pour compenser le manque de fiabilité...
+// Fonction de normalisation pour les potentiomètres avec un mini/maxi ainsi qu'une précision (pas).
+// Retranche 10 pour compenser le manque de fiabilité des potentiomètres...
 int updatePotentio(uint8_t PinPotentio, int Potentio_max, int Potentio_min) {
-  //int valueUpdated = int(((float(analogRead(PinPotentio)/10) / Potentio_min) * (Potentio_max)) * 10) + 10;
   int valueUpdated = (map(analogRead(PinPotentio), 0, 1023, Potentio_min, Potentio_max)/uPas)*uPas;
   return valueUpdated;
 }
@@ -198,7 +211,7 @@ int updatePotentio(uint8_t PinPotentio, int Potentio_max, int Potentio_min) {
 void setup() {
 
   // Interruption
-  attachInterrupt(digitalPinToInterrupt(ButtonForcer), Forced, FALLING); // Déclenchement quand une chute vers l'état BAS.
+  attachInterrupt(digitalPinToInterrupt(ButtonForcer), Forced, FALLING); //Déclenchement quand une chute vers l'état BAS.
 
   // Affectations
   Serial.begin(115200);
@@ -206,11 +219,11 @@ void setup() {
 
   lcd.begin(16, 2);
   lcd.createChar(0, zero);
-  lcd.createChar(1, un);
-  lcd.createChar(2, deux);
-  lcd.createChar(3, trois);
-  lcd.createChar(4, quatre);
-  lcd.createChar(5, cinq);
+  lcd.createChar(1, one);
+  lcd.createChar(2, two);
+  lcd.createChar(3, three);
+  lcd.createChar(4, four);
+  lcd.createChar(5, five);
 
   pinMode(LedRGB_R, OUTPUT);
   pinMode(LedRGB_G, OUTPUT);
@@ -221,10 +234,10 @@ void setup() {
   pinMode(LedAction, OUTPUT);
   pinMode(RelayMoteur, OUTPUT);
   pinMode(ButtonValidation, INPUT_PULLUP);
-  pinMode(ButtonForcer, INPUT_PULLUP); // Bouton est passant en PULLUP
+  pinMode(ButtonForcer, INPUT_PULLUP); //Bouton est passant en PULLUP
 
 
-  functionTestSensor ();    // Test initial sur le capteur MPRLS + écran de démarrage.
+  functionTestSensor ();    //Test initial sur le capteur MPRLS + écran de démarrage.
   lcd.begin(16, 2);
   lcd.print("  GOTCHA !");
     lcd.setCursor(0, 1);
@@ -235,6 +248,7 @@ void setup() {
 
   // Lecture de la pression depuis le capteur
   pressure_hpa = mpr.readPressure();
+
   
   // INITIALISATION
   lcd.clear();
@@ -248,7 +262,7 @@ void setup() {
     lcd.clear();
     lcd.print("SET low. point :");
      lcd.setCursor(0, 1);
-     lowPoint = updatePotentio(PinPotentioL, PotentioL_max, PotentioL_min);
+     lowPoint = updatePotentio(PinPotentioL, PressureL_hpa_max, atmPressure_hpa);
      lcd.print(lowPoint);
      lcd.print(" hPa");
     delay(100);
@@ -260,13 +274,13 @@ void setup() {
     }
   }
   while (digitalRead(ButtonValidation) == HIGH);
-  delay(350); // Evite de passer la séquence si le bouton n'est pas relaché assez vite.
+  delay(350); //Evite de passer la séquence si le bouton n'est pas relaché assez vite.
   
   do {
     lcd.clear();
     lcd.print("SET max. point :");
      lcd.setCursor(0, 1);
-     maxPoint = updatePotentio(PinPotentioH, PotentioH_max, PotentioH_min);
+     maxPoint = updatePotentio(PinPotentioH, lowPoint, atmPressure_hpa);
      lcd.print(maxPoint);
      lcd.print(" hPa");
     delay(100);
