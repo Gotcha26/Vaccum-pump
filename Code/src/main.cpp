@@ -6,7 +6,7 @@
 
 // Settings for initialisation
 volatile int debugMode = 1;
-String myVersion = "       v03.52.00";
+String myVersion = "       v03.53.00";
 unsigned int time_break = 10000;
 int PotentioL_min = 1024;
 int PotentioL_max = 700;
@@ -186,7 +186,8 @@ void updateProgressBar(unsigned long a, unsigned long b, int lineToPrintOn) {
 // Fonction de normalisation pour les potentiomètres avec un mini/maxi ainsi qu'une précision au dixiaime seulement.
 // Ajout de +10 pour compenser le manque de fiabilité...
 int updatePotentio(uint8_t PinPotentio, int Potentio_max, int Potentio_min) {
-  int valueUpdated = int(((float(analogRead(PinPotentio)/10) / Potentio_min) * Potentio_max) * 10) + 10;
+  //int valueUpdated = int(((float(analogRead(PinPotentio)/10) / Potentio_min) * (Potentio_max)) * 10) + 10;
+  int valueUpdated = map (analogRead(PinPotentio), 0, 1023, Potentio_min, Potentio_max);
   return valueUpdated;
 }
 
