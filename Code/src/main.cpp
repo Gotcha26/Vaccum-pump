@@ -6,12 +6,12 @@
 
 // Settings for initialisation
 volatile int debugMode = 1;
-String myVersion = "       v03.51.00";
+String myVersion = "       v03.52.00";
 unsigned int time_break = 10000;
-int PotentioL_min = 0;
-int PotentioL_max = 800;
-int PotentioH_min = 0;
-int PotentioH_max = 700;
+int PotentioL_min = 1024;
+int PotentioL_max = 700;
+int PotentioH_min = 1024;
+int PotentioH_max = 800;
 
 // Taux de rafraichissement (en milli-secondes) .
 int frameRate = 500;  
@@ -126,6 +126,7 @@ void functionTestSensor () {
 }
 
 
+// Fonction pour la petite barre de progression (compte à rebours) pour l'anti-drible
 void updateProgressBar(unsigned long a, unsigned long b, int lineToPrintOn) {
     double factor = time_break / (1.0*(5*5));        // Répartition du plein moment sur le nombre de colonnes disponnibles (5*5 = 25 colonnes)
     unsigned long delta = (a - b);                   // Quantité de temps à répartir.
@@ -182,6 +183,16 @@ void updateProgressBar(unsigned long a, unsigned long b, int lineToPrintOn) {
  }
 
 
+// Fonction de normalisation pour les potentiomètres avec un mini/maxi ainsi qu'une précision au dixiaime seulement.
+// Ajout de +10 pour compenser le manque de fiabilité...
+int updatePotentio(uint8_t PinPotentio, int Potentio_max, int Potentio_min) {
+  int valueUpdated = int(((float(analogRead(PinPotentio)/10) / Potentio_min) * Potentio_max) * 10) + 10;
+  return valueUpdated;
+}
+
+
+
+
 void setup() {
 
   // Interruption
@@ -235,7 +246,7 @@ void setup() {
     lcd.clear();
     lcd.print("SET low. point :");
      lcd.setCursor(0, 1);
-     lowPoint = (float(analogRead(PinPotentioL))*1.0)/(1024*700);
+     lowPoint = updatePotentio(PinPotentioL, PotentioL_max, PotentioL_min);
      lcd.print(lowPoint);
      lcd.print(" hPa");
     delay(100);
@@ -253,7 +264,7 @@ void setup() {
     lcd.clear();
     lcd.print("SET max. point :");
      lcd.setCursor(0, 1);
-     maxPoint = (int(analogRead(PinPotentioH))/10)*10;
+     maxPoint = updatePotentio(PinPotentioH, PotentioH_max, PotentioH_min);
      lcd.print(maxPoint);
      lcd.print(" hPa");
     delay(100);
