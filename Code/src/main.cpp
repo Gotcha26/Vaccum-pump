@@ -5,9 +5,13 @@
 
 
 // Settings for initialisation
-volatile int debugMode = 0;
-String myVersion = "       v03.50.00";
+volatile int debugMode = 1;
+String myVersion = "       v03.51.00";
 unsigned int time_break = 10000;
+int PotentioL_min = 0;
+int PotentioL_max = 800;
+int PotentioH_min = 0;
+int PotentioH_max = 700;
 
 // Taux de rafraichissement (en milli-secondes) .
 int frameRate = 500;  
@@ -231,7 +235,7 @@ void setup() {
     lcd.clear();
     lcd.print("SET low. point :");
      lcd.setCursor(0, 1);
-     lowPoint = (int(analogRead(PinPotentioL))/10)*10;
+     lowPoint = (float(analogRead(PinPotentioL))*1.0)/(1024*700);
      lcd.print(lowPoint);
      lcd.print(" hPa");
     delay(100);
@@ -277,11 +281,11 @@ void loop() {
   Serial.println(" hPa");
   
   ValuePotentioH = (analogRead(PinPotentioH));
-  Serial.print("Valeure prise par PotentioH :");
+  Serial.print("Valeure ABS prise par PotentioH :");
   Serial.println(ValuePotentioH);
   
   ValuePotentioL = (analogRead(PinPotentioL));
-  Serial.print("Valeure prise par PotentioL :");
+  Serial.print("Valeure ABS prise par PotentioL :");
   Serial.println(ValuePotentioL);
 
   Serial.print("Etat du bouton de validation : ");
