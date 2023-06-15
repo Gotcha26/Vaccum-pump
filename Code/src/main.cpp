@@ -5,11 +5,11 @@
 
 
 // Settings for initialisation
-volatile int debugMode = 0;
-String myVersion = "       v03.22.00";
-#define delayDrible 10000
-u32 _millis = millis();
-u32 _umillis = 0;
+volatile int debugMode = 9;
+String myVersion = "       v03.30.10";
+unsigned int delayDrible = 10000;
+unsigned long tempoStart = millis();
+unsigned long tempoStop = 0; //LA BONNE VALEURE = 0 !!!
 
 
 // You dont *need* a reset and EOC pin for most uses, so we set to -1 and don't connect
@@ -72,6 +72,15 @@ void setLedRGB (int R, int G, int B) {
 
 }
 
+// Bargraph
+// https://www.instructables.com/Simple-Progress-Bar-for-Arduino-and-LCD/
+byte zero[]   = {B00000, B00000, B00000, B00000, B00000, B00000, B00000, B00000};
+byte un[]     = {B10000, B10000, B10000, B10000, B10000, B10000, B10000, B10000};
+byte deux[]   = {B11000, B11000, B11000, B11000, B11000, B11000, B11000, B11000};
+byte trois[]  = {B11100, B11100, B11100, B11100, B11100, B11100, B11100, B11100};
+byte quatre[] = {B11110, B11110, B11110, B11110, B11110, B11110, B11110, B11110};
+byte cinq[]   = {B11111, B11111, B11111, B11111, B11111, B11111, B11111, B11111};
+
 
 // Fonction d'interruption
 void Forced() {
@@ -112,6 +121,65 @@ void functionTestSensor () {
 }
 
 
+void updateProgressBar(unsigned long a, unsigned long b, int lineToPrintOn) {
+    double factor = delayDrible / (1.0*(5*5));        // Répartition du plein moment sur le nombre de colonnes disponnibles (5*5 = 25 colonnes)
+    unsigned long delta = (a - b);   // Temps (quantitée) à répartir.
+    int rest;                                         // Tps/Qt (-1) éfficasses
+    if (delta >= delayDrible) {
+      rest = delayDrible;
+    } else {
+      rest = delayDrible - (a - b);
+    }
+    int percent = (rest+1) / factor;
+
+    //double factor = totalCount/(1.0*(5*5)); // 1.0 * (Nombre de caractères * Nombre de colonnes)
+    //unsigned int percent = (delayDrible - count) / factor;         // Pourcentage
+    int number = percent/5;                 //Nombre de caractères (blocs) entiers
+    int remainder = percent%5;              //Restant, de la division par 5 sur la variable "percent".
+    if (debugMode >= 9) {
+      Serial.print("Valeure prise par tempoStart  : ");
+      Serial.println(a);
+      Serial.print("Valeure prise par tempoStop : ");
+      Serial.println(b);
+      Serial.print("Valeure prise par delaydrible : ");
+      Serial.println(delayDrible);
+      Serial.println("-------");
+      Serial.print("Valeure prise par delta est de : ");
+      Serial.println(delta);
+      Serial.print("Valeure prise par rest est de : ");
+      Serial.println(rest);
+      Serial.print("Valeure prise par factor est de : ");
+      Serial.println(factor);
+      Serial.print("Valeure prise par percent est de : ");
+      Serial.println(percent);
+      Serial.print("Valeure prise par number est de : ");
+      Serial.println(number);
+      Serial.print("Valeure prise par remainder est de : ");
+      Serial.println(remainder);
+      Serial.println("-------");
+      //delay(1000);
+    }
+    if(number > 0)
+    {
+      for(int j = 0; j < number; j++)
+      {
+        lcd.setCursor(j,lineToPrintOn);
+       lcd.write(5);
+      }
+    }
+       lcd.setCursor(number,lineToPrintOn);
+       lcd.write(remainder); 
+     if(number < 5)	//If using a 20 character display, this should be 20!
+    {
+      for(int j = number+1; j <= 5; j++)  //If using a 20 character display, this should be 20!
+      {
+        lcd.setCursor(j,lineToPrintOn);
+       lcd.write((byte)0);
+      }
+    }  
+ }
+
+
 void setup() {
 
   // Interruption
@@ -120,6 +188,14 @@ void setup() {
   // Affectations
   Serial.begin(115200);
   analogWrite(contrastPin, Contrast);
+
+  lcd.begin(16, 2);
+  lcd.createChar(0, zero);
+  lcd.createChar(1, un);
+  lcd.createChar(2, deux);
+  lcd.createChar(3, trois);
+  lcd.createChar(4, quatre);
+  lcd.createChar(5, cinq);
 
   pinMode(LedRGB_R, OUTPUT);
   pinMode(LedRGB_G, OUTPUT);
@@ -138,7 +214,7 @@ void setup() {
   lcd.print("  GOTCHA !");
     lcd.setCursor(0, 1);
     lcd.print(myVersion);
-  int i = frameRate * 10;
+  int i = frameRate * 6;
   delay(i);
 
 
@@ -148,11 +224,10 @@ void setup() {
   // INITIALISATION
   setLedRGB (255, 255, 0);
   lcd.clear();
-  lcd.begin(16, 2);
   lcd.print(" INITIALISATION");
    lcd.setCursor(0, 1);
    lcd.print("****************");
-  delay(3000);
+  delay(1200);
 
   do {
     lcd.clear();
@@ -227,38 +302,35 @@ void loop() {
     lcd.print("hPa Actual: ");
     lcd.print(pressure_hpa);
     lcd.print(" "); // Efface le reste de la ligne
-    if (pressure_hpa >= maxPoint) { // En fonction (700hpa)
-        lcd.setCursor(5, 1);
-        lcd.print("Next : ");
-        lcd.print(lowPoint);
-        lcd.print("   ");
-      if (debugMode >= 9) {
-        Serial.print("Valeure prise par _millis  : ");
-        Serial.println(_millis);
-        Serial.print("Valeure prise par _umillis : ");
-        Serial.println(_umillis);
-        delay(5000);
-      }
-      _millis = millis(); // Attribution d'un compteur temps
-      if ((_millis - _umillis) >= delayDrible) {
+    if (pressure_hpa >= maxPoint) {                                           // En fonction (700hpa)
+      lcd.setCursor(6, 1);
+      lcd.print("Next: ");
+      lcd.print(lowPoint);
+      lcd.print("   ");
+      tempoStart = millis();
+      updateProgressBar(tempoStart, tempoStop, 2);
+      if (tempoStart - tempoStop >= delayDrible) {
         digitalWrite(LedAction, HIGH);
         digitalWrite(RelayMoteur, HIGH);
       } else {
-        digitalWrite(LedAction, HIGH); // Clignotement car le moteur est en phase de repos (anti-drible).
+        digitalWrite(LedAction, HIGH);                                      // Clignotement car le moteur est en phase de repos (anti-drible).
         delay(50);
         digitalWrite(LedAction, LOW);
         delay(25);
       }
     }
-    else if (pressure_hpa <= lowPoint) { // En attente (800hpa)
-      _umillis = millis();
+    else if (pressure_hpa <= lowPoint) {                                    // En attente (800hpa)
+      tempoStop = millis();
       digitalWrite(LedAction, LOW);
       digitalWrite(RelayMoteur, LOW);
-      lcd.setCursor(5, 1);
-      lcd.print("Next : ");
+      lcd.setCursor(6, 1);
+      lcd.print("Next: ");
       lcd.print(maxPoint);
       lcd.print("   ");
+      updateProgressBar(millis(), tempoStart, 2);
     }
+                                                                          // Entre les deux valeurs !
     delay(frameRate);
+    //updateProgressBar(tempoStart, tempoStop, 2);
   }
 }
