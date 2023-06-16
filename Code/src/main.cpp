@@ -35,7 +35,7 @@ Pour l'affichage/utilisation du dispositif, vous avez le choix entre des mesures
 - Pression MANOMETRIQUE (bar) Plage allant de -1 (moins un) à 0 (zéro) [chiffres inférieurs ou égaux à zéro]
 */
 
-String Unite = "jj";                  // Par défaut, pour ne pas avoir à affichier de nombre négatif, je préfère affichier des hPa.
+String Unite = "hPa";                  // Par défaut, pour ne pas avoir à affichier de nombre négatif, je préfère affichier des hPa.
 
 /*
 *********************************************************************************************************************************************************
@@ -43,8 +43,9 @@ String Unite = "jj";                  // Par défaut, pour ne pas avoir à affic
 
 
 // Valeurs par défaut. NE PAS MODIFIER pour rester dans une plage raisonnable !
-unsigned int PressureL_hpa_max = 700;  // Valeure seuil la plus petite de pression absolue. Par défaut 750 hpa
-unsigned int PressureH_hpa_max = 800;  // Valeure seuil la plus grande de pression absolue. Par défaut 830 hpa
+int PressureL_hpa_max = 700;  // Valeure seuil la plus petite de pression absolue. Par défaut 750 hpa
+int PressureH_hpa_max = 800;  // Valeure seuil la plus grande de pression absolue. Par défaut 830 hpa
+// Normalement elles sont déclarée en unsigned int
 
 float PressureL_bar_max = -0.250;      // Valeure seuil la plus petite de pression manométrique. Par défaut -0.250 bar
 float PressureH_bar_max = -0.170;      // Valeure seuil la plus grande de pression manométrique. Par défaut -0.170 bar
@@ -58,14 +59,17 @@ byte uPas = 10;                     // Pas (précision) des potentiomètres. Par
 int frameRate = 500;                // Taux de rafraichissement (en milli-secondes) pour l'exécution du programme. Par défaut : 500 ms
 
 volatile int debugMode = 1;         // Mode de débuggage
-String myVersion = "v04.00.15";     // Version
+String myVersion = "v04.10.00";     // Version
 
-volatile int lowPoint;
-volatile int maxPoint;
-String pressure_hpa;
-float pressure_bar;
+volatile float lowPoint;
+volatile float maxPoint;
+float Pressure;
+float atmPressure;
+float PressureL_max;
+float PressureH_max;
 float ValuePotentioH;
 float ValuePotentioL;
+char outstr[15];
 
 // Attribution des Pin;
 static const byte LedAction =  52;
@@ -220,9 +224,13 @@ void updateProgressBar(unsigned long a, unsigned long b, int lineToPrintOn) {
 
 // Fonction de normalisation pour les potentiomètres avec un mini/maxi ainsi qu'une précision (pas).
 // Retranche 10 pour compenser le manque de fiabilité des potentiomètres...
-int updatePotentio(uint8_t PinPotentio, int Potentio_max, int Potentio_min) {
+int updatePotentio_hpa(uint8_t PinPotentio, int Potentio_max, int Potentio_min) {
   int valueUpdated = (map(analogRead(PinPotentio), 0, 1023, Potentio_min, Potentio_max)/uPas)*uPas;
   return valueUpdated;
+}
+float updatePotentio_bar(uint8_t PinPotentio, float Potentio_max, float Potentio_min) {
+    float valueUpdated = map(analogRead(PinPotentio), 0, 1023, (0), (Potentio_max * 1000));
+    return valueUpdated / 1000;
 }
 
 
@@ -266,42 +274,28 @@ void setup() {
   if (debugMode > 0) {delay(frameRate);} else {delay(i);} //En cas de débuggage : accélaration.
 
 
-  // Lecture de la pression depuis le capteur
-  pressure_hpa = mpr.readPressure();
-  pressure_bar = mpr.readPressure() / 1000;
-
   // Correspondance hpa <=> bar
-  if (Unite == "hpa") {
-      lcd.clear();
-      lcd.print("hpa");
-      delay(10000);
+  if (Unite == "hPa") {
+      Pressure = mpr.readPressure();
+      //lcd.clear();
+      //lcd.print(Pressure);
+      //delay(10000);
   } else if (Unite == "bar") {
-      lcd.clear();
-      lcd.print("bar");
-      delay(10000);
-  } else if (Unite != "hpa" || "bar") {
+      Pressure = mpr.readPressure() / 1000;
+      //lcd.clear();
+      //lcd.print(Pressure);
+      //delay(10000);
+  } else if (Unite != "hPa" || "bar") {
     while (1)
     {
       setLedRGB (255, 0, 0);
       lcd.clear();
-      lcd.setCursor(7, 0);
-      lcd.print("!!!");
+      lcd.setCursor(0, 0);
+      lcd.print("  ! WARNING !");
       lcd.setCursor(0, 1);
       lcd.print("UNDEFINED UNIT !");
       delay(1000);
     }
-  }
-
-  if (PressureL_bar_max !=PressureH_bar_max) {
-    Serial.println("N'est pas égal. Choix en pression MANOMETRIQUE (bar).");
-    PressureL_hpa_max = (atmPressure_bar + PressureL_bar_max) * 1000;
-    PressureH_hpa_max = (atmPressure_bar + PressureH_bar_max) * 1000;
-    Serial.println(PressureL_hpa_max);
-    Serial.println(PressureH_hpa_max);
-    Unite = "bar";
-  } else {
-    Serial.print("Est égal. Choix pression ABSOLUE (hpa).");
-    Unite = "hpa";
   }
 
   
@@ -315,19 +309,19 @@ void setup() {
   do {
     setLedRGB (255, 255, 0);
     lcd.clear();
+      //lcd.print(PressureL_hpa_max);
+      //lcd.setCursor(0, 1);
+      //lcd.print(atmPressure);
+      //delay(10000);
+      //lcd.clear();
     lcd.print("SET low. point :");
      lcd.setCursor(0, 1);
-     lowPoint = updatePotentio(PinPotentioL, PressureL_hpa_max, atmPressure_hpa);
-     lcd.print(lowPoint);
-     lcd.print(" hPa");
+     if (Unite == "hPa") { lowPoint = updatePotentio_hpa(PinPotentioL, PressureL_hpa_max, atmPressure_hpa); } else { lowPoint = updatePotentio_bar(PinPotentioL, PressureL_bar_max, atmPressure_bar); }
+     if (Unite == "hPa") { lcd.print(dtostrf(lowPoint, 4, 0, outstr)); } else { lcd.print(dtostrf(lowPoint, 5, 3, outstr)); }
+     lcd.print(" ");
+     lcd.print(Unite);
     delay(100);
-    if (debugMode >= 100) {
-      Serial.print("Valeure prise par lowPoint : ");
-      Serial.println(lowPoint);
-       Serial.print("Etat du bouton de validation : ");
-       Serial.println(String(digitalRead(ButtonValidation)));
     }
-  }
   while (digitalRead(ButtonValidation) == HIGH);
   delay(350); //Evite de passer la séquence si le bouton n'est pas relaché assez vite.
   
@@ -335,17 +329,12 @@ void setup() {
     lcd.clear();
     lcd.print("SET max. point :");
      lcd.setCursor(0, 1);
-     maxPoint = updatePotentio(PinPotentioH, lowPoint, atmPressure_hpa);
-     lcd.print(maxPoint);
-     lcd.print(" hPa");
+     if (Unite == "hPa") { maxPoint = updatePotentio_hpa(PinPotentioH, lowPoint, atmPressure_hpa); } else { maxPoint = updatePotentio_bar(PinPotentioH, lowPoint, atmPressure_bar); }
+     if (Unite == "hPa") { lcd.print(dtostrf(maxPoint, 4, 0, outstr)); } else { lcd.print(dtostrf(maxPoint, 5, 3, outstr)); }
+     lcd.print(" ");
+     lcd.print(Unite);
     delay(100);
-    if (debugMode >= 100) {
-      Serial.print("Valeure prise par maxPoint : ");
-      Serial.println(lowPoint);
-       Serial.print("Etat du bouton de validation : ");
-       Serial.println(String(digitalRead(ButtonValidation)));
     }
-  }
   while (digitalRead(ButtonValidation) == HIGH);
 
 }
@@ -356,42 +345,25 @@ void loop() {
   bool Starting1 = 1;
   bool Impulse;
 
-  // Affichage de la datas
-  if (debugMode >= 100) {
-  Serial.print("Pression actuelle : ");
-  Serial.print(pressure_hpa);
-  Serial.println(" hPa");
-  
-  ValuePotentioH = (analogRead(PinPotentioH));
-  Serial.print("Valeure ABS prise par PotentioH :");
-  Serial.println(ValuePotentioH);
-  
-  ValuePotentioL = (analogRead(PinPotentioL));
-  Serial.print("Valeure ABS prise par PotentioL :");
-  Serial.println(ValuePotentioL);
-
-  Serial.print("Etat du bouton de validation : ");
-  Serial.println(String(digitalRead(ButtonValidation)));
-  }
-
   lcd.clear();
-   lcd.print("LET'S STARTED !!");
+  lcd.print("LET'S STARTED !!");
   delay(2000);
   lcd.clear();
   setLedRGB (0, 255, 0);
 
   while (1) { // Boucle infinie
     functionTestSensor (); // Test sur le capteur MPRLS
-    int pressure_hpa = mpr.readPressure();
+    if (Unite == "hPa") { Pressure = mpr.readPressure(); } else { Pressure = (mpr.readPressure() / 1000) - atmPressure_bar; }
     lcd.setCursor(0, 0);
-    lcd.print("hPa Actual: ");
-    lcd.print(pressure_hpa);
+    lcd.print(Unite);
+    lcd.print(" Actual:");
+    if (Unite == "hPa") { lcd.print(" "); lcd.print(Pressure); } else { lcd.print(dtostrf(Pressure, 5, 2, outstr)); }
     lcd.print(" "); // Efface le reste de la ligne
-    if (pressure_hpa >= maxPoint) {                                           // En fonction (700hpa)
+    if (Pressure >= maxPoint) {                                           // En fonction (700hpa)
       lcd.setCursor(6, 1);
-      lcd.print("Next: ");
-      lcd.print(lowPoint);
-      lcd.print("   ");
+      lcd.print("Next:");
+      if (Unite == "hPa") { lcd.print(" "); lcd.print(lowPoint); } else { lcd.print(dtostrf(lowPoint, 5, 3, outstr)); }
+      //lcd.print("   ");
       time_now = millis();
       if (Starting1 == 1) {time_previous = time_now + time_break;}                // Verification si le moteur peut se lancer directement ou s'il doit attendre (anti-drible).
       if (time_now - time_previous >= time_break) {
@@ -407,16 +379,16 @@ void loop() {
           delay(25);
           Impulse = 1;
       }
-    } else if (pressure_hpa <= lowPoint) {                                    // En attente (800hpa)  
+    } else if (Pressure <= lowPoint) {                                    // En attente (800hpa)  
         time_previous = time_now;
         Starting1 = 0;
         Impulse = 0;
         digitalWrite(LedAction, LOW);
         digitalWrite(RelayMoteur, LOW);
         lcd.setCursor(6, 1);
-        lcd.print("Next: ");
-        lcd.print(maxPoint);
-        lcd.print("   ");
+        lcd.print("Next:");
+        if (Unite == "hPa") { lcd.print(" "); lcd.print(maxPoint); } else { lcd.print(dtostrf(maxPoint, 5, 3, outstr)); }
+        //lcd.print("   ");
     }  
     if (Impulse == 0) {                                                       // Entre les deux valeurs !
       updateProgressBar(millis(), time_now, 2);
