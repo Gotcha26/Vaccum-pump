@@ -15,41 +15,39 @@ Plus d'informations : https://www.thermal-engineering.org/fr/quest-ce-que-la-pre
 La pression MANOMÉTRIQUE (appelée aussi "pression de jauge") n'est autre d'une mesure __relative__ en fonction de l'environement ouvert où se trouve
 l'appreil (jauge) de mesure.
 Cette pression relative sera donc souvent exprimée en barre (bar) où la différence est faite en fonction de la pression atmosphérique.
-Cette pression relative sera donc positive ou négative. Au niveau de la mer (0m d'altitude) cette pression vaut 1013.25 hpa (soit 1,01325 bar).
+Cette pression relative sera donc positive ou négative. Au niveau de la mer (0m d'altitude) cette pression vaut 1,01325 bar (soit 1013.25 hpa).
 
+*** CALCULS ***
 Aussi, une pression négative (communément dénommée "dépression"), sera l'expression de cette différence de pression entre 2 points.
 Par calcul, pour une valeure de dépression de -0.250 bar (manomètrique) la pression ABSOLUE correspondante vaudra :
 1.01325 - 0.250 = 0.76325 bar ou encore 763.25 hpa.
 Par calcul, pour une valeure de dépression de -0.175 bar (manomètrique) la pression ABSOLUE correspondante vaudra :
 1.01325 - 0.175 = 0.83825 bar ou encore 838.25 hpa.
+*** ***
 
 
 *********************************************************************************************************************************************************
-|                                                            Initialisation Pression ABSOLUE                                                            |
+|                                                               Choix de l'unité de mesure                                                              |
 *********************************************************************************************************************************************************
 
-S'IL VOUS PLAIT, cette section ne s'adresse QUE et UNIQUEMENT SI vous désirez travailler en exprimant vos valeures de pression en ABSOLUE (hPa).
-Si ce n'est pas le cas, MERCI DE BIEN VOULOIR LAISSER LES VARIABLES CI-APRES **A ZERO** !!!
+Pour l'affichage/utilisation du dispositif, vous avez le choix entre des mesures en :
+- Pression ABSOLUE (hpa). Plage allant 0 (zéro) et +∞ (infini). [chiffres positifs]
+- Pression MANOMETRIQUE (bar) Plage allant de -1 (moins un) à 0 (zéro) [chiffres inférieurs ou égaux à zéro]
 */
-unsigned int PressureL_hpa_max = 0;        // Valeure seuil la plus petite de pression absolue. Par défaut 750 hpa
-unsigned int PressureH_hpa_max = 0;        // Valeure seuil la plus grande de pression absolue. Par défaut 830 hpa
 
-
-/*
-*********************************************************************************************************************************************************
-|                                                         Initialisation Pression MANOMETRIQUE                                                          |
-*********************************************************************************************************************************************************
-
-S'IL VOUS PLAIT, cette section ne s'adresse QUE et UNIQUEMENT SI vous désirez travailler en exprimant vos valeures de pression en MANOMETRIQUE (bar).
-Les valeures accéptés vont de 0.000 (zéro) à -1.000 (moins un). Les décimales sont a prendre en compte.
-Si ce n'est pas le cas, MERCI DE BIEN VOULOIR LAISSER LES VARIABLES CI-APRES **A ZERO** !!!
-*/
-float PressureL_bar_max = -0.250;        // Valeure seuil la plus petite de pression manométrique. Par défaut -0.250 bar
-float PressureH_bar_max = -0.170;        // Valeure seuil la plus grande de pression manométrique. Par défaut -0.170 bar
+String Unite = "jj";                  // Par défaut, pour ne pas avoir à affichier de nombre négatif, je préfère affichier des hPa.
 
 /*
 *********************************************************************************************************************************************************
 */
+
+
+// Valeurs par défaut. NE PAS MODIFIER pour rester dans une plage raisonnable !
+unsigned int PressureL_hpa_max = 700;  // Valeure seuil la plus petite de pression absolue. Par défaut 750 hpa
+unsigned int PressureH_hpa_max = 800;  // Valeure seuil la plus grande de pression absolue. Par défaut 830 hpa
+
+float PressureL_bar_max = -0.250;      // Valeure seuil la plus petite de pression manométrique. Par défaut -0.250 bar
+float PressureH_bar_max = -0.170;      // Valeure seuil la plus grande de pression manométrique. Par défaut -0.170 bar
 
 
 // Settings for initialisation
@@ -60,7 +58,14 @@ byte uPas = 10;                     // Pas (précision) des potentiomètres. Par
 int frameRate = 500;                // Taux de rafraichissement (en milli-secondes) pour l'exécution du programme. Par défaut : 500 ms
 
 volatile int debugMode = 1;         // Mode de débuggage
-String myVersion = "v04.00.10";     // Version
+String myVersion = "v04.00.15";     // Version
+
+volatile int lowPoint;
+volatile int maxPoint;
+String pressure_hpa;
+float pressure_bar;
+float ValuePotentioH;
+float ValuePotentioL;
 
 // Attribution des Pin;
 static const byte LedAction =  52;
@@ -69,16 +74,6 @@ static const byte ButtonValidation = 26;
 static const byte ButtonForcer = 18;
 static const uint8_t PinPotentioH = A15;
 static const uint8_t PinPotentioL = A14;
-
-
-volatile int lowPoint;
-volatile int maxPoint;
-
-String pressure_hpa;
-float pressure_bar;
-String Unite;
-float ValuePotentioH;
-float ValuePotentioL;
 
 
 // Paramètres LCD ;
@@ -275,7 +270,28 @@ void setup() {
   pressure_hpa = mpr.readPressure();
   pressure_bar = mpr.readPressure() / 1000;
 
-  // Test pour une conversion hPa => bar
+  // Correspondance hpa <=> bar
+  if (Unite == "hpa") {
+      lcd.clear();
+      lcd.print("hpa");
+      delay(10000);
+  } else if (Unite == "bar") {
+      lcd.clear();
+      lcd.print("bar");
+      delay(10000);
+  } else if (Unite != "hpa" || "bar") {
+    while (1)
+    {
+      setLedRGB (255, 0, 0);
+      lcd.clear();
+      lcd.setCursor(7, 0);
+      lcd.print("!!!");
+      lcd.setCursor(0, 1);
+      lcd.print("UNDEFINED UNIT !");
+      delay(1000);
+    }
+  }
+
   if (PressureL_bar_max !=PressureH_bar_max) {
     Serial.println("N'est pas égal. Choix en pression MANOMETRIQUE (bar).");
     PressureL_hpa_max = (atmPressure_bar + PressureL_bar_max) * 1000;
