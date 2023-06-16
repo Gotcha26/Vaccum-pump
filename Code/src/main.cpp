@@ -54,12 +54,12 @@ float PressureH_bar_max = -0.170;      // Valeure seuil la plus grande de pressi
 // Settings for initialisation
 unsigned int time_break = 10000;    // Temps minimum pour empècher un redémarrage à chaux du relais. Protection anti-drible. Par défaut : 10000 ms
 int atmPressure_hpa = 1008;         // Pression atmosphérique classic. 1013 hpa. Il n'est pas vraiment nécessaire de modifier cette valeure.
-float atmPressure_bar = 1.01;         // Pression atmosphérique classic. 1.01 bar. Il n'est pas vraiment nécessaire de modifier cette valeure.
+float atmPressure_bar = 1.01;       // Pression atmosphérique classic. 1.01 bar. Il n'est pas vraiment nécessaire de modifier cette valeure.
 byte uPas = 10;                     // Pas (précision) des potentiomètres. Par défaut : 10
 int frameRate = 500;                // Taux de rafraichissement (en milli-secondes) pour l'exécution du programme. Par défaut : 500 ms
 
-volatile int debugMode = 1;         // Mode de débuggage
-String myVersion = "v04.10.00";     // Version
+volatile int debugMode = 0;         // Mode de débuggage
+String myVersion = "v04.20.00";     // Version
 
 volatile float lowPoint;
 volatile float maxPoint;
@@ -112,12 +112,12 @@ unsigned long time_now = millis();
 unsigned long time_previous = 0;
 
 // https://www.instructables.com/Simple-Progress-Bar-for-Arduino-and-LCD/
-byte zero[]   = {B00000, B00000, B00000, B00000, B00000, B00000, B00000, B00000};
-byte one[]     = {B10000, B10000, B10000, B10000, B10000, B10000, B10000, B10000};
+byte zero[]  = {B00000, B00000, B00000, B00000, B00000, B00000, B00000, B00000};
+byte one[]   = {B10000, B10000, B10000, B10000, B10000, B10000, B10000, B10000};
 byte two[]   = {B11000, B11000, B11000, B11000, B11000, B11000, B11000, B11000};
-byte three[]  = {B11100, B11100, B11100, B11100, B11100, B11100, B11100, B11100};
-byte four[] = {B11110, B11110, B11110, B11110, B11110, B11110, B11110, B11110};
-byte five[]   = {B11111, B11111, B11111, B11111, B11111, B11111, B11111, B11111};
+byte three[] = {B11100, B11100, B11100, B11100, B11100, B11100, B11100, B11100};
+byte four[]  = {B11110, B11110, B11110, B11110, B11110, B11110, B11110, B11110};
+byte five[]  = {B11111, B11111, B11111, B11111, B11111, B11111, B11111, B11111};
 
 
 // Marche forcée.
@@ -229,7 +229,7 @@ int updatePotentio_hpa(uint8_t PinPotentio, int Potentio_max, int Potentio_min) 
   return valueUpdated;
 }
 float updatePotentio_bar(uint8_t PinPotentio, float Potentio_max, float Potentio_min) {
-    float valueUpdated = map(analogRead(PinPotentio), 0, 1023, (0), (Potentio_max * 1000));
+    float valueUpdated = map(analogRead(PinPotentio), 0, 1023, (0), (Potentio_max * 1000)/(uPas/2))*(uPas/2);
     return valueUpdated / 1000;
 }
 
@@ -270,7 +270,7 @@ void setup() {
   lcd.print("  GOTCHA !");
     lcd.setCursor(7, 1);
     lcd.print(myVersion);
-  int i = frameRate * 6;
+  unsigned int i = frameRate * 6;
   if (debugMode > 0) {delay(frameRate);} else {delay(i);} //En cas de débuggage : accélaration.
 
 
@@ -304,7 +304,19 @@ void setup() {
   lcd.print(" INITIALISATION");
    lcd.setCursor(0, 1);
    lcd.print("****************");
-  if (debugMode > 0) {delay(500);} else {delay(1200);} //En cas de débuggage : accélaration.
+  i = millis();
+  unsigned int duration;
+  if (debugMode > 0) { duration = frameRate; } else { duration = frameRate * 3; }
+  while ( millis() < (i + duration) ) {
+    if ( digitalRead(ButtonValidation) == LOW ) {
+      delay(200);
+      if ( Unite == "bar" ) {
+        Unite = "hPa";
+      } else {
+          Unite = "bar";
+      }
+    }
+  }
 
   do {
     setLedRGB (255, 255, 0);
