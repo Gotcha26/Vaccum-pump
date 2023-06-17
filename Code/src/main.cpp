@@ -36,6 +36,7 @@ Pour l'affichage/utilisation du dispositif, vous avez le choix entre des mesures
 */
 
 String Unite = "hPa";                  // Par défaut, pour ne pas avoir à affichier de nombre négatif, je préfère affichier des hPa.
+// hPa !!! et non pas hpa...
 
 /*
 *********************************************************************************************************************************************************
@@ -43,12 +44,12 @@ String Unite = "hPa";                  // Par défaut, pour ne pas avoir à affi
 
 
 // Valeurs par défaut. NE PAS MODIFIER pour rester dans une plage raisonnable !
-int PressureL_hpa_max = 700;  // Valeure seuil la plus petite de pression absolue. Par défaut 750 hpa
-int PressureH_hpa_max = 800;  // Valeure seuil la plus grande de pression absolue. Par défaut 830 hpa
+int PressureL_hpa_max = 700;  // Valeure seuil la plus petite de pression absolue. Par défaut 700 hPa [Demo : 500 hPa] {Réel : 750 hPa}
+int PressureH_hpa_max = 800;  // Valeure seuil la plus grande de pression absolue. Par défaut 800 hPa [Demo : 900 hPa] {Réel : 825 hpa}
 // Normalement elles sont déclarée en unsigned int
 
-float PressureL_bar_max = -0.250;      // Valeure seuil la plus petite de pression manométrique. Par défaut -0.250 bar
-float PressureH_bar_max = -0.170;      // Valeure seuil la plus grande de pression manométrique. Par défaut -0.170 bar
+float PressureL_bar_max = -0.3;      // Valeure seuil la plus petite de pression manométrique. Par défaut -0.3 bar [Demo -0.5 bar] {Réel : -0.250 bar}
+float PressureH_bar_max = -0.2;      // Valeure seuil la plus grande de pression manométrique. Par défaut -0.2 bar [Demo -0.1 bar] {Réel : -0.175 bar}
 
 
 // Settings for initialisation
@@ -58,11 +59,11 @@ float atmPressure_bar = 1.01;       // Pression atmosphérique classic. 1.01 bar
 byte uPas = 10;                     // Pas (précision) des potentiomètres. Par défaut : 10
 int frameRate = 500;                // Taux de rafraichissement (en milli-secondes) pour l'exécution du programme. Par défaut : 500 ms
 
-volatile int debugMode = 0;         // Mode de débuggage
-String myVersion = "v04.20.00";     // Version
+byte debugMode = 0;                 // Mode de débuggage
+String myVersion = "v04.21.00";     // Version
 
-volatile float lowPoint;
-volatile float maxPoint;
+float lowPoint;
+float maxPoint;
 float Pressure;
 float atmPressure;
 float PressureL_max;
@@ -71,7 +72,7 @@ float ValuePotentioH;
 float ValuePotentioL;
 char outstr[15];
 
-// Attribution des Pin;
+// Attribution des Pins;
 static const byte LedAction =  52;
 static const byte RelayMoteur = 23;
 static const byte ButtonValidation = 26;
@@ -84,7 +85,7 @@ static const uint8_t PinPotentioL = A14;
 const int rs = 12, en = 11, d4 = 5, d5 = 4, d6 = 3, d7 = 2;
 LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
 const int contrastPin = 6;
-int Contrast=75;    // Contraste de 0 à 100
+int Contrast = 75;    // Contraste de 0 à 100
 
 
 // LED RGB pour l'état du dispositif.
@@ -93,12 +94,16 @@ int Contrast=75;    // Contraste de 0 à 100
 #define LedRGB_B A2
 
 
+// Couleur rouge
+// setLedRGB(255, 0, 0);
+// Couleur vert
+// setLedRGB(0, 255, 0);
+// Couleur bleu
+// setLedRGB(0, 0, 255);
 // Couleur jaune
 // setLedRGB(255, 255, 0);
 // Couleur orange
 // setLedRGB(255, 128, 0);
-// Couleur rouge
-// setLedRGB(255, 0, 0);
 void setLedRGB (int R, int G, int B) {
 
   analogWrite(LedRGB_R, R);
@@ -135,11 +140,13 @@ void Forced() {
 void functionExit () {
 
   while (1) {
+
     setLedRGB(255, 0, 0);
     digitalWrite(LedAction, LOW);
     digitalWrite(RelayMoteur, LOW);
     delay(100);
-    }
+
+  }
 
 }
 
@@ -153,13 +160,16 @@ Adafruit_MPRLS mpr = Adafruit_MPRLS(RESET_PIN, EOC_PIN);
 void functionTestSensor () {
 
   if (debugMode >= 90) {Serial.println("MPRLS Simple Test");}
-  if (! mpr.begin(0x18)) { // Adresse par défaut 0x18 pour ce capteur
+  if (! mpr.begin(0x18)) {    // Adresse par défaut 0x18 pour ce capteur
+  
   Serial.println("Failed to communicate with MPRLS sensor, check wiring?");
   lcd.clear();
-    lcd.setCursor(0, 1);
-    lcd.print("Error Com MPRLS");
+  lcd.setCursor(0, 1);
+  lcd.print("Error Com MPRLS");
   functionExit();
+
   }
+
   if (debugMode >= 90) {Serial.println("Found MPRLS sensor");}
 
 }
@@ -167,25 +177,23 @@ void functionTestSensor () {
 
 // Fonction pour la petite barre de progression (compte à rebours) pour l'anti-drible
 void updateProgressBar(unsigned long a, unsigned long b, int lineToPrintOn) {
-    double factor = time_break / (1.0*(5*5));        // Répartition du plein moment sur le nombre de colonnes disponnibles (5*5 = 25 colonnes)
+    double factor = time_break / (1.0*(5*5));        // Répartition du plein moment sur le nombre de colonnes disponnibles (5 caractères * 5 colonnes = 25 colonnes au total à disposition.)
     unsigned long delta = (a - b);                   // Quantité de temps à répartir.
-    int rest;                                        // Temps (normalisé)
+    int rest;                                        // Temps (répartie)
     if (delta >= time_break) {
+
       rest = time_break;
+
     } else {
+
       rest = time_break - (a - b);
+
     }
     int percent = (rest+1) / factor;
     byte number = percent/5;                         //Nombre de caractères (blocs) entiers
     int remainder = percent%5;                       //Restant (pouillèmes) de la division par 5 sur la variable "percent". https://www.lalanguefrancaise.com/dictionnaire/definition/pouilleme
     if (debugMode >= 10) {
-      Serial.print("Valeure prise par time_now  :        ");
-      Serial.println(a);
-      Serial.print("Valeure prise par time_previous :    ");
-      Serial.println(b);
-      Serial.print("Valeure prise par time_break :       ");
-      Serial.println(time_break);
-      Serial.println("-------");
+
       Serial.print("Valeure prise par delta est de :     ");
       Serial.println(delta);
       Serial.print("Valeure prise par rest est de :      ");
@@ -200,37 +208,47 @@ void updateProgressBar(unsigned long a, unsigned long b, int lineToPrintOn) {
       Serial.println(remainder);
       Serial.println("-------");
       //delay(1000);
+
     }
-    if(number > 0)
-    {
-      for(int j = 0; j < number; j++)
-      {
-        lcd.setCursor(j,lineToPrintOn);
-       lcd.write(5);
+
+    if (number > 0) {
+
+      for (int j = 0; j < number; j++) {
+
+        lcd.setCursor(j, lineToPrintOn);
+        lcd.write(5);
+
       }
+
     }
-       lcd.setCursor(number,lineToPrintOn);
+       lcd.setCursor(number, lineToPrintOn);
        lcd.write(remainder); 
-     if(number < 5)	//If using a 20 character display, this should be 20!
-    {
-      for(int j = number+1; j <= 5; j++)  //If using a 20 character display, this should be 20!
-      {
-        lcd.setCursor(j,lineToPrintOn);
-       lcd.write((byte)0);
+    if (number < 5)	{        
+                      //If using a 20 character display, this should be 20!
+      for (int j = number+1; j <= 5; j++)  { //If using a 20 character display, this should be 20!
+
+      lcd.setCursor(j, lineToPrintOn);
+      lcd.write((byte)0);
+
       }
-    }  
+
+    } 
+
  }
 
 
 // Fonction de normalisation pour les potentiomètres avec un mini/maxi ainsi qu'une précision (pas).
-// Retranche 10 pour compenser le manque de fiabilité des potentiomètres...
-int updatePotentio_hpa(uint8_t PinPotentio, int Potentio_max, int Potentio_min) {
-  int valueUpdated = (map(analogRead(PinPotentio), 0, 1023, Potentio_min, Potentio_max)/uPas)*uPas;
+int updatePotentio_hpa(uint8_t PinPotentio, int Potentio_max, int atmPressure) {
+
+  int valueUpdated = (map(analogRead(PinPotentio), 0, 1023, atmPressure, Potentio_max)/uPas)*uPas;
   return valueUpdated;
+
 }
-float updatePotentio_bar(uint8_t PinPotentio, float Potentio_max, float Potentio_min) {
-    float valueUpdated = map(analogRead(PinPotentio), 0, 1023, (0), (Potentio_max * 1000)/(uPas/2))*(uPas/2);
+float updatePotentio_bar(uint8_t PinPotentio, float Potentio_max, float atmPressure) {
+
+    float valueUpdated = map(analogRead(PinPotentio), 0, 1023, (atmPressure), (Potentio_max * 1000)/(uPas/2))*(uPas/2);
     return valueUpdated / 1000;
+
 }
 
 
@@ -239,7 +257,7 @@ float updatePotentio_bar(uint8_t PinPotentio, float Potentio_max, float Potentio
 void setup() {
 
   // Interruption
-  attachInterrupt(digitalPinToInterrupt(ButtonForcer), Forced, FALLING); //Déclenchement quand une chute vers l'état BAS.
+  attachInterrupt(digitalPinToInterrupt(ButtonForcer), Forced, FALLING); //Déclenchement lors d'une chute vers l'état BAS.
 
   // Affectations
   Serial.begin(115200);
@@ -268,26 +286,25 @@ void setup() {
   functionTestSensor ();    //Test initial sur le capteur MPRLS + écran de démarrage.
   lcd.begin(16, 2);
   lcd.print("  GOTCHA !");
-    lcd.setCursor(7, 1);
-    lcd.print(myVersion);
+  lcd.setCursor(7, 1);
+  lcd.print(myVersion);
   unsigned int i = frameRate * 6;
   if (debugMode > 0) {delay(frameRate);} else {delay(i);} //En cas de débuggage : accélaration.
 
 
-  // Correspondance hpa <=> bar
+  // Correspondance hPa <=> bar
   if (Unite == "hPa") {
+
       Pressure = mpr.readPressure();
-      //lcd.clear();
-      //lcd.print(Pressure);
-      //delay(10000);
+
   } else if (Unite == "bar") {
-      Pressure = mpr.readPressure() / 1000;
-      //lcd.clear();
-      //lcd.print(Pressure);
-      //delay(10000);
+
+    Pressure = mpr.readPressure() / 1000;
+
   } else if (Unite != "hPa" || "bar") {
-    while (1)
-    {
+
+    while (1) {
+
       setLedRGB (255, 0, 0);
       lcd.clear();
       lcd.setCursor(0, 0);
@@ -295,59 +312,66 @@ void setup() {
       lcd.setCursor(0, 1);
       lcd.print("UNDEFINED UNIT !");
       delay(1000);
+
     }
+
   }
 
   
   // INITIALISATION
+  setLedRGB (255, 0, 0); // Rouge
   lcd.clear();
   lcd.print(" INITIALISATION");
-   lcd.setCursor(0, 1);
-   lcd.print("****************");
+  lcd.setCursor(0, 1);
+  lcd.print("****************");
   i = millis();
   unsigned int duration;
-  if (debugMode > 0) { duration = frameRate; } else { duration = frameRate * 3; }
-  while ( millis() < (i + duration) ) {
+  if (debugMode > 0) {duration = frameRate;} else {duration = frameRate * 3;}
+  while (millis() < (i + duration)) {
+
     if ( digitalRead(ButtonValidation) == LOW ) {
-      delay(200);
+
+      delay(250);
       if ( Unite == "bar" ) {
+
         Unite = "hPa";
+
       } else {
+
           Unite = "bar";
       }
+
     }
+
   }
 
   do {
-    setLedRGB (255, 255, 0);
+
+    setLedRGB (0, 0, 255); // Bleu
     lcd.clear();
-      //lcd.print(PressureL_hpa_max);
-      //lcd.setCursor(0, 1);
-      //lcd.print(atmPressure);
-      //delay(10000);
-      //lcd.clear();
     lcd.print("SET low. point :");
-     lcd.setCursor(0, 1);
-     if (Unite == "hPa") { lowPoint = updatePotentio_hpa(PinPotentioL, PressureL_hpa_max, atmPressure_hpa); } else { lowPoint = updatePotentio_bar(PinPotentioL, PressureL_bar_max, atmPressure_bar); }
-     if (Unite == "hPa") { lcd.print(dtostrf(lowPoint, 4, 0, outstr)); } else { lcd.print(dtostrf(lowPoint, 5, 3, outstr)); }
-     lcd.print(" ");
-     lcd.print(Unite);
+    lcd.setCursor(0, 1);
+    if (Unite == "hPa") {lowPoint = updatePotentio_hpa(PinPotentioL, PressureL_hpa_max, atmPressure_hpa);} else {lowPoint = updatePotentio_bar(PinPotentioL, PressureL_bar_max, atmPressure_bar);}
+    if (Unite == "hPa") {lcd.print(dtostrf(lowPoint, 4, 0, outstr));} else {lcd.print(dtostrf(lowPoint, 5, 3, outstr));}
+    lcd.print(" ");
+    lcd.print(Unite);
     delay(100);
-    }
-  while (digitalRead(ButtonValidation) == HIGH);
+
+  } while (digitalRead(ButtonValidation) == HIGH);
+
   delay(350); //Evite de passer la séquence si le bouton n'est pas relaché assez vite.
-  
   do {
+
     lcd.clear();
     lcd.print("SET max. point :");
-     lcd.setCursor(0, 1);
-     if (Unite == "hPa") { maxPoint = updatePotentio_hpa(PinPotentioH, lowPoint, atmPressure_hpa); } else { maxPoint = updatePotentio_bar(PinPotentioH, lowPoint, atmPressure_bar); }
-     if (Unite == "hPa") { lcd.print(dtostrf(maxPoint, 4, 0, outstr)); } else { lcd.print(dtostrf(maxPoint, 5, 3, outstr)); }
-     lcd.print(" ");
-     lcd.print(Unite);
+    lcd.setCursor(0, 1);
+    if (Unite == "hPa") {maxPoint = updatePotentio_hpa(PinPotentioH, lowPoint, atmPressure_hpa);} else {maxPoint = updatePotentio_bar(PinPotentioH, lowPoint, atmPressure_bar);}
+    if (Unite == "hPa") {lcd.print(dtostrf(maxPoint, 4, 0, outstr));} else {lcd.print(dtostrf(maxPoint, 5, 3, outstr));}
+    lcd.print(" ");
+    lcd.print(Unite);
     delay(100);
-    }
-  while (digitalRead(ButtonValidation) == HIGH);
+
+  } while (digitalRead(ButtonValidation) == HIGH);
 
 }
 
@@ -361,37 +385,45 @@ void loop() {
   lcd.print("LET'S STARTED !!");
   delay(2000);
   lcd.clear();
-  setLedRGB (0, 255, 0);
+  setLedRGB (0, 255, 0); // Vert
 
   while (1) { // Boucle infinie
+    
     functionTestSensor (); // Test sur le capteur MPRLS
-    if (Unite == "hPa") { Pressure = mpr.readPressure(); } else { Pressure = (mpr.readPressure() / 1000) - atmPressure_bar; }
+    if (Unite == "hPa") {Pressure = mpr.readPressure();} else {Pressure = (mpr.readPressure() / 1000) - atmPressure_bar;}
     lcd.setCursor(0, 0);
     lcd.print(Unite);
     lcd.print(" Actual:");
-    if (Unite == "hPa") { lcd.print(" "); lcd.print(Pressure); } else { lcd.print(dtostrf(Pressure, 5, 2, outstr)); }
-    lcd.print(" "); // Efface le reste de la ligne
+    if (Unite == "hPa") {lcd.print(" "); lcd.print(Pressure);} else {lcd.print(dtostrf(Pressure, 5, 2, outstr));}
+    //lcd.print(" "); // Efface le reste de la ligne
     if (Pressure >= maxPoint) {                                           // En fonction (700hpa)
+      
       lcd.setCursor(6, 1);
       lcd.print("Next:");
-      if (Unite == "hPa") { lcd.print(" "); lcd.print(lowPoint); } else { lcd.print(dtostrf(lowPoint, 5, 3, outstr)); }
-      //lcd.print("   ");
+      if (Unite == "hPa") {lcd.print(" "); lcd.print(lowPoint);} else {lcd.print(dtostrf(lowPoint, 5, 3, outstr));}
+      //lcd.print("   "); // Efface le reste de la ligne
       time_now = millis();
       if (Starting1 == 1) {time_previous = time_now + time_break;}                // Verification si le moteur peut se lancer directement ou s'il doit attendre (anti-drible).
       if (time_now - time_previous >= time_break) {
+
         updateProgressBar(time_now, time_previous, 2);
         digitalWrite(LedAction, HIGH);
         digitalWrite(RelayMoteur, HIGH);
         Impulse = 1;
-        } else {
-          updateProgressBar(time_now, time_previous, 2);
-          digitalWrite(LedAction, HIGH);                                          // Clignotement car le moteur est en phase de repos (anti-drible).
-          delay(50);
-          digitalWrite(LedAction, LOW);
-          delay(25);
-          Impulse = 1;
+
+      } else {
+
+        updateProgressBar(time_now, time_previous, 2);
+        digitalWrite(LedAction, HIGH);                                          // Clignotement car le moteur est en phase de repos (anti-drible).
+        delay(50);
+        digitalWrite(LedAction, LOW);
+        delay(25);
+        Impulse = 1;
+
       }
+
     } else if (Pressure <= lowPoint) {                                    // En attente (800hpa)  
+        
         time_previous = time_now;
         Starting1 = 0;
         Impulse = 0;
@@ -399,16 +431,24 @@ void loop() {
         digitalWrite(RelayMoteur, LOW);
         lcd.setCursor(6, 1);
         lcd.print("Next:");
-        if (Unite == "hPa") { lcd.print(" "); lcd.print(maxPoint); } else { lcd.print(dtostrf(maxPoint, 5, 3, outstr)); }
+        if (Unite == "hPa") {lcd.print(" "); lcd.print(maxPoint);} else {lcd.print(dtostrf(maxPoint, 5, 3, outstr));}
         //lcd.print("   ");
-    }  
+        
+    }
+
     if (Impulse == 0) {                                                       // Entre les deux valeurs !
+      
       updateProgressBar(millis(), time_now, 2);
+
     } else {
+
       if (debugMode >= 100) {Serial.println("Zone entre deux.");}
       time_now = millis();
+
     }
+
     delay(frameRate);
+    
   }
 
 }
