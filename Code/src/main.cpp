@@ -31,11 +31,11 @@ Par calcul, pour une valeure de dépression de -0.175 bar (manomètrique) la pre
 *********************************************************************************************************************************************************
 
 Pour l'affichage/utilisation du dispositif, vous avez le choix entre des mesures en :
-- Pression ABSOLUE (hpa). Plage allant 0 (zéro) et +∞ (infini). [chiffres positifs]
+- Pression ABSOLUE (hPa). Plage allant 0 (zéro) et +∞ (infini). [chiffres positifs]
 - Pression MANOMETRIQUE (bar) Plage allant de -1 (moins un) à 0 (zéro) [chiffres inférieurs ou égaux à zéro]
 */
 
-String Unite = "hPa";                  // Par défaut, pour ne pas avoir à affichier de nombre négatif, je préfère affichier des hPa.
+String Unite = "bar";                  // Par défaut, pour ne pas avoir à affichier de nombre négatif, je préfère affichier des hPa.
 // hPa !!! et non pas hpa...
 
 /*
@@ -44,23 +44,22 @@ String Unite = "hPa";                  // Par défaut, pour ne pas avoir à affi
 
 
 // Valeurs par défaut. NE PAS MODIFIER pour rester dans une plage raisonnable !
-int PressureL_hpa_max = 700;  // Valeure seuil la plus petite de pression absolue. Par défaut 700 hPa [Demo : 500 hPa] {Réel : 750 hPa}
-int PressureH_hpa_max = 800;  // Valeure seuil la plus grande de pression absolue. Par défaut 800 hPa [Demo : 900 hPa] {Réel : 825 hpa}
-// Normalement elles sont déclarée en unsigned int
+unsigned int PressureL_hpa_max = 500;  // Valeure seuil la plus petite de pression absolue. Tend vers 0. Par défaut 700 hPa [Demo : 500 hPa] {Réel : 750 hPa}
+unsigned int PressureH_hpa_max = 900;  // Valeure seuil la plus grande de pression absolue. Tend vers 1. Par défaut 800 hPa [Demo : 900 hPa] {Réel : 825 hpa}
 
-float PressureL_bar_max = -0.3;      // Valeure seuil la plus petite de pression manométrique. Par défaut -0.3 bar [Demo -0.5 bar] {Réel : -0.250 bar}
-float PressureH_bar_max = -0.2;      // Valeure seuil la plus grande de pression manométrique. Par défaut -0.2 bar [Demo -0.1 bar] {Réel : -0.175 bar}
+float PressureL_bar_max = -0.5;        // Valeure seuil la plus petite de pression manométrique. Tend vers 1. Par défaut -0.3 bar [Demo -0.5 bar] {Réel : -0.250 bar}
+float PressureH_bar_max = -0.1;        // Valeure seuil la plus grande de pression manométrique. Tend vers 0. Par défaut -0.2 bar [Demo -0.1 bar] {Réel : -0.175 bar}
+
+byte debugMode = 0;                    // Mode de débuggage
+String myVersion = "v04.22.00";        // Version
 
 
 // Settings for initialisation
-unsigned int time_break = 10000;    // Temps minimum pour empècher un redémarrage à chaux du relais. Protection anti-drible. Par défaut : 10000 ms
-int atmPressure_hpa = 1008;         // Pression atmosphérique classic. 1013 hpa. Il n'est pas vraiment nécessaire de modifier cette valeure.
-float atmPressure_bar = 1.01;       // Pression atmosphérique classic. 1.01 bar. Il n'est pas vraiment nécessaire de modifier cette valeure.
-byte uPas = 10;                     // Pas (précision) des potentiomètres. Par défaut : 10
-int frameRate = 500;                // Taux de rafraichissement (en milli-secondes) pour l'exécution du programme. Par défaut : 500 ms
-
-byte debugMode = 0;                 // Mode de débuggage
-String myVersion = "v04.21.00";     // Version
+unsigned int time_break = 10000;       // Temps minimum pour empècher un redémarrage à chaux du moteur. Protection antidémarrage/anti-dribble. Par défaut : 10000 ms
+int atmPressure_hpa = 1008;            // Pression atmosphérique classic. 1013 hpa. Il n'est pas vraiment nécessaire de modifier cette valeure.
+float atmPressure_bar = 1.01;          // Pression atmosphérique classic. 1.01 bar. Il n'est pas vraiment nécessaire de modifier cette valeure.
+byte uPas = 10;                        // Pas (précision) des potentiomètres. Par défaut : 10
+unsigned int frameRate = 500;          // Taux de rafraichissement (en milli-secondes) pour l'exécution du programme. Par défaut : 500 ms
 
 float lowPoint;
 float maxPoint;
@@ -71,44 +70,37 @@ float PressureH_max;
 float ValuePotentioH;
 float ValuePotentioL;
 char outstr[15];
+double puissanceLED = 0.25;            // Facteur de puissance pour la led d'état du système en PWM. De 0 à 1. Par défaut : 0.25
 
 // Attribution des Pins;
-static const byte LedAction =  52;
-static const byte RelayMoteur = 23;
-static const byte ButtonValidation = 26;
-static const byte ButtonForcer = 18;
-static const uint8_t PinPotentioH = A15;
-static const uint8_t PinPotentioL = A14;
+#define LedAction 52
+#define RelayMoteur 23
+#define ButtonValidation 26
+#define ButtonForcer 18
+#define PinPotentioH A15
+#define PinPotentioL A14
+#define LedRGB_R 10
+#define LedRGB_G 9
+#define LedRGB_B 8
 
 
 // Paramètres LCD ;
 const int rs = 12, en = 11, d4 = 5, d5 = 4, d6 = 3, d7 = 2;
 LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
-const int contrastPin = 6;
-int Contrast = 75;    // Contraste de 0 à 100
+#define contrastPin 6
+unsigned char Contrast = 75;           // Contraste de 0 à 100. Par défaut : 75
 
 
-// LED RGB pour l'état du dispositif.
-#define LedRGB_R A0
-#define LedRGB_G A1
-#define LedRGB_B A2
-
-
-// Couleur rouge
-// setLedRGB(255, 0, 0);
-// Couleur vert
-// setLedRGB(0, 255, 0);
-// Couleur bleu
-// setLedRGB(0, 0, 255);
-// Couleur jaune
-// setLedRGB(255, 255, 0);
-// Couleur orange
-// setLedRGB(255, 128, 0);
+// Couleur rouge (255, 0, 0)
+// Couleur vert (0, 255, 0)
+// Couleur bleu (0, 0, 255)
+// Couleur jaune (255, 255, 0)
+// Couleur orange (255, 128, 0)
 void setLedRGB (int R, int G, int B) {
 
-  analogWrite(LedRGB_R, R);
-  analogWrite(LedRGB_G, G);
-  analogWrite(LedRGB_B, B);
+  analogWrite(LedRGB_R, R * puissanceLED);
+  analogWrite(LedRGB_G, G * puissanceLED);
+  analogWrite(LedRGB_B, B * puissanceLED);
 
 }
 
@@ -129,9 +121,7 @@ byte five[]  = {B11111, B11111, B11111, B11111, B11111, B11111, B11111, B11111};
 // Fonction d'interruption.
 void Forced() {
 
-  maxPoint = 0;
-  lowPoint = 0;
-  Serial.println("Je suis là !");
+  if (Unite == "hPa") {maxPoint = lowPoint = 0;} else {maxPoint = lowPoint = -1;}
 
 }
 
@@ -223,9 +213,9 @@ void updateProgressBar(unsigned long a, unsigned long b, int lineToPrintOn) {
     }
        lcd.setCursor(number, lineToPrintOn);
        lcd.write(remainder); 
-    if (number < 5)	{        
-                      //If using a 20 character display, this should be 20!
-      for (int j = number+1; j <= 5; j++)  { //If using a 20 character display, this should be 20!
+    if (number < 5)	{                         //If using a 20 character display, this should be 20!
+
+      for (int j = number+1; j <= 5; j++)  {  //If using a 20 character display, this should be 20!
 
       lcd.setCursor(j, lineToPrintOn);
       lcd.write((byte)0);
@@ -275,7 +265,7 @@ void setup() {
   pinMode(LedRGB_G, OUTPUT);
   pinMode(LedRGB_B, OUTPUT);
 
-  setLedRGB(0, 0, 255);
+  setLedRGB(255, 0, 0); // Rouge
 
   pinMode(LedAction, OUTPUT);
   pinMode(RelayMoteur, OUTPUT);
@@ -305,7 +295,7 @@ void setup() {
 
     while (1) {
 
-      setLedRGB (255, 0, 0);
+      setLedRGB (255, 0, 0); //Rouge
       lcd.clear();
       lcd.setCursor(0, 0);
       lcd.print("  ! WARNING !");
@@ -319,7 +309,7 @@ void setup() {
 
   
   // INITIALISATION
-  setLedRGB (255, 0, 0); // Rouge
+  setLedRGB (255, 128, 0); // Orange
   lcd.clear();
   lcd.print(" INITIALISATION");
   lcd.setCursor(0, 1);
@@ -331,6 +321,7 @@ void setup() {
 
     if ( digitalRead(ButtonValidation) == LOW ) {
 
+      setLedRGB (0, 255, 0); // Vert
       delay(250);
       if ( Unite == "bar" ) {
 
@@ -448,7 +439,7 @@ void loop() {
     }
 
     delay(frameRate);
-    
+
   }
 
 }
