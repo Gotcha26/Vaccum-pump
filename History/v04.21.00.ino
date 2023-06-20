@@ -1,7 +1,7 @@
 #include <Arduino.h>
 #include <Wire.h>
 #include <Adafruit_MPRLS.h>
-#include <LiquidCrystal_I2C.h>
+#include <LiquidCrystal.h>
 
 /*
 *********************************************************************************************************************************************************
@@ -31,7 +31,7 @@ Par calcul, pour une valeure de dépression de -0.175 bar (manomètrique) la pre
 *********************************************************************************************************************************************************
 
 Pour l'affichage/utilisation du dispositif, vous avez le choix entre des mesures en :
-- Pression ABSOLUE (hPa). Plage allant 0 (zéro) et +∞ (infini). [chiffres positifs]
+- Pression ABSOLUE (hpa). Plage allant 0 (zéro) et +∞ (infini). [chiffres positifs]
 - Pression MANOMETRIQUE (bar) Plage allant de -1 (moins un) à 0 (zéro) [chiffres inférieurs ou égaux à zéro]
 */
 
@@ -44,22 +44,23 @@ String Unite = "hPa";                  // Par défaut, pour ne pas avoir à affi
 
 
 // Valeurs par défaut. NE PAS MODIFIER pour rester dans une plage raisonnable !
-unsigned int PressureL_hpa_max = 500;  // Valeure seuil la plus petite de pression absolue. Tend vers 0. Par défaut 700 hPa [Demo : 500 hPa] {Réel : 750 hPa}
-unsigned int PressureH_hpa_max = 900;  // Valeure seuil la plus grande de pression absolue. Tend vers 1. Par défaut 800 hPa [Demo : 900 hPa] {Réel : 825 hpa}
+int PressureL_hpa_max = 700;  // Valeure seuil la plus petite de pression absolue. Par défaut 700 hPa [Demo : 500 hPa] {Réel : 750 hPa}
+int PressureH_hpa_max = 800;  // Valeure seuil la plus grande de pression absolue. Par défaut 800 hPa [Demo : 900 hPa] {Réel : 825 hpa}
+// Normalement elles sont déclarée en unsigned int
 
-float PressureL_bar_max = -0.5;        // Valeure seuil la plus petite de pression manométrique. Tend vers 1. Par défaut -0.3 bar [Demo -0.5 bar] {Réel : -0.250 bar}
-float PressureH_bar_max = -0.1;        // Valeure seuil la plus grande de pression manométrique. Tend vers 0. Par défaut -0.2 bar [Demo -0.1 bar] {Réel : -0.175 bar}
-
-byte debugMode = 1;                    // Mode de débuggage
-String myVersion = "v05.00.00";        // Version
+float PressureL_bar_max = -0.3;      // Valeure seuil la plus petite de pression manométrique. Par défaut -0.3 bar [Demo -0.5 bar] {Réel : -0.250 bar}
+float PressureH_bar_max = -0.2;      // Valeure seuil la plus grande de pression manométrique. Par défaut -0.2 bar [Demo -0.1 bar] {Réel : -0.175 bar}
 
 
 // Settings for initialisation
-unsigned int time_break = 10000;       // Temps minimum pour empècher un redémarrage à chaux du moteur. Protection antidémarrage/anti-dribble. Par défaut : 10000 ms
-int atmPressure_hpa = 1008;            // Pression atmosphérique classic. 1013 hpa. Il n'est pas vraiment nécessaire de modifier cette valeure.
-float atmPressure_bar = 1.01;          // Pression atmosphérique classic. 1.01 bar. Il n'est pas vraiment nécessaire de modifier cette valeure.
-byte uPas = 10;                        // Pas (précision) des potentiomètres. Par défaut : 10
-unsigned int frameRate = 500;          // Taux de rafraichissement (en milli-secondes) pour l'exécution du programme. Par défaut : 500 ms
+unsigned int time_break = 10000;    // Temps minimum pour empècher un redémarrage à chaux du relais. Protection anti-drible. Par défaut : 10000 ms
+int atmPressure_hpa = 1008;         // Pression atmosphérique classic. 1013 hpa. Il n'est pas vraiment nécessaire de modifier cette valeure.
+float atmPressure_bar = 1.01;       // Pression atmosphérique classic. 1.01 bar. Il n'est pas vraiment nécessaire de modifier cette valeure.
+byte uPas = 10;                     // Pas (précision) des potentiomètres. Par défaut : 10
+int frameRate = 500;                // Taux de rafraichissement (en milli-secondes) pour l'exécution du programme. Par défaut : 500 ms
+
+byte debugMode = 0;                 // Mode de débuggage
+String myVersion = "v04.21.00";     // Version
 
 float lowPoint;
 float maxPoint;
@@ -70,35 +71,44 @@ float PressureH_max;
 float ValuePotentioH;
 float ValuePotentioL;
 char outstr[15];
-double puissanceLED = 0.20;            // Facteur de puissance pour la led d'état du système en PWM. De 0 à 1. Par défaut : 0.25
 
 // Attribution des Pins;
-#define LedAction A1
-#define RelayMoteur 23
-#define ButtonValidation 6
-#define ButtonForcer 7
-#define PinPotentioH A15
-#define PinPotentioL A14
-#define LedRGB_R 10
-#define LedRGB_G 9
-#define LedRGB_B 8
+static const byte LedAction =  52;
+static const byte RelayMoteur = 23;
+static const byte ButtonValidation = 26;
+static const byte ButtonForcer = 18;
+static const uint8_t PinPotentioH = A15;
+static const uint8_t PinPotentioL = A14;
 
 
-// Paramètres LCD I2C;
-LiquidCrystal_I2C lcd(0x27, 20, 4);    // Adresse 0x27, 20 caractères et 4 lignes
-unsigned char Contrast = 75;           // Contraste de 0 à 100. Par défaut : 75
+// Paramètres LCD ;
+const int rs = 12, en = 11, d4 = 5, d5 = 4, d6 = 3, d7 = 2;
+LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
+const int contrastPin = 6;
+int Contrast = 75;    // Contraste de 0 à 100
 
 
-// Couleur rouge (255, 0, 0)
-// Couleur vert (0, 255, 0)
-// Couleur bleu (0, 0, 255)
-// Couleur jaune (255, 255, 0)
-// Couleur orange (255, 128, 0)
+// LED RGB pour l'état du dispositif.
+#define LedRGB_R A0
+#define LedRGB_G A1
+#define LedRGB_B A2
+
+
+// Couleur rouge
+// setLedRGB(255, 0, 0);
+// Couleur vert
+// setLedRGB(0, 255, 0);
+// Couleur bleu
+// setLedRGB(0, 0, 255);
+// Couleur jaune
+// setLedRGB(255, 255, 0);
+// Couleur orange
+// setLedRGB(255, 128, 0);
 void setLedRGB (int R, int G, int B) {
 
-  analogWrite(LedRGB_R, R * puissanceLED);
-  analogWrite(LedRGB_G, G * puissanceLED);
-  analogWrite(LedRGB_B, B * puissanceLED);
+  analogWrite(LedRGB_R, R);
+  analogWrite(LedRGB_G, G);
+  analogWrite(LedRGB_B, B);
 
 }
 
@@ -107,21 +117,21 @@ unsigned long time_now = millis();
 unsigned long time_previous = 0;
 
 // https://www.instructables.com/Simple-Progress-Bar-for-Arduino-and-LCD/
-byte zero[]   = {B00000, B00000, B00000, B00000, B00000, B00000, B00000, B00000};
-byte one[]    = {B10000, B10000, B10000, B10000, B10000, B10000, B10000, B10000};
-byte two[]    = {B11000, B11000, B11000, B11000, B11000, B11000, B11000, B11000};
-byte three[]  = {B11100, B11100, B11100, B11100, B11100, B11100, B11100, B11100};
-byte four[]   = {B11110, B11110, B11110, B11110, B11110, B11110, B11110, B11110};
-byte five[]   = {B11111, B11111, B11111, B11111, B11111, B11111, B11111, B11111};
-
-byte arrowR[] = {B00000, B00000, B00100, B00010, B11111, B00010, B00100, B00000};
+byte zero[]  = {B00000, B00000, B00000, B00000, B00000, B00000, B00000, B00000};
+byte one[]   = {B10000, B10000, B10000, B10000, B10000, B10000, B10000, B10000};
+byte two[]   = {B11000, B11000, B11000, B11000, B11000, B11000, B11000, B11000};
+byte three[] = {B11100, B11100, B11100, B11100, B11100, B11100, B11100, B11100};
+byte four[]  = {B11110, B11110, B11110, B11110, B11110, B11110, B11110, B11110};
+byte five[]  = {B11111, B11111, B11111, B11111, B11111, B11111, B11111, B11111};
 
 
 // Marche forcée.
 // Fonction d'interruption.
 void Forced() {
 
-  if (Unite == "hPa") {maxPoint = lowPoint = 0;} else {maxPoint = lowPoint = -1;}
+  maxPoint = 0;
+  lowPoint = 0;
+  Serial.println("Je suis là !");
 
 }
 
@@ -167,11 +177,9 @@ void functionTestSensor () {
 
 // Fonction pour la petite barre de progression (compte à rebours) pour l'anti-drible
 void updateProgressBar(unsigned long a, unsigned long b, int lineToPrintOn) {
-    byte P = 9;                                    // Nombre de cases entières disponibles
-    byte C = 5;                                     // Nombre de colonnes par case entière (normalement 5 !)
-    float factor = time_break / (1.0*(P*C));        // Combien de millisecondes représente chaque colonne (maximun).
-    unsigned long delta = (a - b);                  // Combien de millisecondes finalement à répartir.
-    int rest;                                       // Temps effectif pris en compte (répartie)
+    double factor = time_break / (1.0*(5*5));        // Répartition du plein moment sur le nombre de colonnes disponnibles (5 caractères * 5 colonnes = 25 colonnes au total à disposition.)
+    unsigned long delta = (a - b);                   // Quantité de temps à répartir.
+    int rest;                                        // Temps (répartie)
     if (delta >= time_break) {
 
       rest = time_break;
@@ -181,17 +189,17 @@ void updateProgressBar(unsigned long a, unsigned long b, int lineToPrintOn) {
       rest = time_break - (a - b);
 
     }
-    int percent = (rest+1) / factor;                // +1
-    byte number = percent/C;                        // Nombre de caractères (blocs) entiers
-    byte remainder = percent%C;                      // Restant (pouillèmes) de la division par 5 colonnes sur la variable "percent". https://www.lalanguefrancaise.com/dictionnaire/definition/pouilleme
+    int percent = (rest+1) / factor;
+    byte number = percent/5;                         //Nombre de caractères (blocs) entiers
+    int remainder = percent%5;                       //Restant (pouillèmes) de la division par 5 sur la variable "percent". https://www.lalanguefrancaise.com/dictionnaire/definition/pouilleme
     if (debugMode >= 10) {
 
-      Serial.print("Valeure prise par factor est de :    ");
-      Serial.println(factor);
       Serial.print("Valeure prise par delta est de :     ");
       Serial.println(delta);
       Serial.print("Valeure prise par rest est de :      ");
       Serial.println(rest);
+      Serial.print("Valeure prise par factor est de :    ");
+      Serial.println(factor);
       Serial.print("Valeure prise par percent est de :   ");
       Serial.println(percent);
       Serial.print("Valeure prise par number est de :    ");
@@ -199,7 +207,7 @@ void updateProgressBar(unsigned long a, unsigned long b, int lineToPrintOn) {
       Serial.print("Valeure prise par remainder est de : ");
       Serial.println(remainder);
       Serial.println("-------");
-      delay(1000);
+      //delay(1000);
 
     }
 
@@ -215,9 +223,9 @@ void updateProgressBar(unsigned long a, unsigned long b, int lineToPrintOn) {
     }
        lcd.setCursor(number, lineToPrintOn);
        lcd.write(remainder); 
-    if (number < P)	{                         // If using a 20 character display, this should be 20!
-
-      for (int j = number+1; j <= P; j++)  {  // If using a 20 character display, this should be 20!
+    if (number < 5)	{        
+                      //If using a 20 character display, this should be 20!
+      for (int j = number+1; j <= 5; j++)  { //If using a 20 character display, this should be 20!
 
       lcd.setCursor(j, lineToPrintOn);
       lcd.write((byte)0);
@@ -249,40 +257,39 @@ float updatePotentio_bar(uint8_t PinPotentio, float Potentio_max, float atmPress
 void setup() {
 
   // Interruption
-  attachInterrupt(digitalPinToInterrupt(ButtonForcer), Forced, FALLING); // Déclenchement lors d'une chute vers l'état BAS.
+  attachInterrupt(digitalPinToInterrupt(ButtonForcer), Forced, FALLING); //Déclenchement lors d'une chute vers l'état BAS.
 
   // Affectations
   Serial.begin(115200);
+  analogWrite(contrastPin, Contrast);
 
-  lcd.init();
-  lcd.backlight();
+  lcd.begin(16, 2);
   lcd.createChar(0, zero);
   lcd.createChar(1, one);
   lcd.createChar(2, two);
   lcd.createChar(3, three);
   lcd.createChar(4, four);
   lcd.createChar(5, five);
-  lcd.createChar(6, arrowR);
 
   pinMode(LedRGB_R, OUTPUT);
   pinMode(LedRGB_G, OUTPUT);
   pinMode(LedRGB_B, OUTPUT);
 
-  setLedRGB(255, 0, 0); // Rouge
+  setLedRGB(0, 0, 255);
 
   pinMode(LedAction, OUTPUT);
   pinMode(RelayMoteur, OUTPUT);
   pinMode(ButtonValidation, INPUT_PULLUP);
-  pinMode(ButtonForcer, INPUT_PULLUP); // Bouton est passant en PULLUP
+  pinMode(ButtonForcer, INPUT_PULLUP); //Bouton est passant en PULLUP
 
 
-  functionTestSensor ();    // Test initial sur le capteur MPRLS + écran de démarrage.
-  lcd.init();
+  functionTestSensor ();    //Test initial sur le capteur MPRLS + écran de démarrage.
+  lcd.begin(16, 2);
   lcd.print("  GOTCHA !");
   lcd.setCursor(7, 1);
   lcd.print(myVersion);
   unsigned int i = frameRate * 6;
-  if (debugMode > 0) {delay(frameRate);} else {delay(i);} // En cas de débuggage : accélaration.
+  if (debugMode > 0) {delay(frameRate);} else {delay(i);} //En cas de débuggage : accélaration.
 
 
   // Correspondance hPa <=> bar
@@ -298,7 +305,7 @@ void setup() {
 
     while (1) {
 
-      setLedRGB (255, 0, 0); // Rouge
+      setLedRGB (255, 0, 0);
       lcd.clear();
       lcd.setCursor(0, 0);
       lcd.print("  ! WARNING !");
@@ -312,11 +319,11 @@ void setup() {
 
   
   // INITIALISATION
-  setLedRGB (255, 128, 0); // Orange
+  setLedRGB (255, 0, 0); // Rouge
   lcd.clear();
-  lcd.print("   INITIALISATION");
+  lcd.print(" INITIALISATION");
   lcd.setCursor(0, 1);
-  lcd.print("********************");
+  lcd.print("****************");
   i = millis();
   unsigned int duration;
   if (debugMode > 0) {duration = frameRate;} else {duration = frameRate * 3;}
@@ -324,7 +331,6 @@ void setup() {
 
     if ( digitalRead(ButtonValidation) == LOW ) {
 
-      setLedRGB (0, 255, 0); // Vert
       delay(250);
       if ( Unite == "bar" ) {
 
@@ -344,33 +350,25 @@ void setup() {
     setLedRGB (0, 0, 255); // Bleu
     lcd.clear();
     lcd.print("SET low. point :");
-    lcd.setCursor(6, 1);
+    lcd.setCursor(0, 1);
     if (Unite == "hPa") {lowPoint = updatePotentio_hpa(PinPotentioL, PressureL_hpa_max, atmPressure_hpa);} else {lowPoint = updatePotentio_bar(PinPotentioL, PressureL_bar_max, atmPressure_bar);}
     if (Unite == "hPa") {lcd.print(dtostrf(lowPoint, 4, 0, outstr));} else {lcd.print(dtostrf(lowPoint, 5, 3, outstr));}
     lcd.print(" ");
     lcd.print(Unite);
-    lcd.setCursor(0, 2);
-    lcd.print("lim low");
-    lcd.setCursor(0, 3);
-    if (Unite == "hPa") {lcd.print("x"); lcd.write(byte(6)); lcd.print("0");} else {lcd.print("x"); lcd.write(byte(6)); lcd.print("-1");};
     delay(100);
 
   } while (digitalRead(ButtonValidation) == HIGH);
 
-  delay(350); // Evite de passer la séquence si le bouton n'est pas relaché assez vite.
+  delay(350); //Evite de passer la séquence si le bouton n'est pas relaché assez vite.
   do {
 
     lcd.clear();
     lcd.print("SET max. point :");
-    lcd.setCursor(6, 1);
+    lcd.setCursor(0, 1);
     if (Unite == "hPa") {maxPoint = updatePotentio_hpa(PinPotentioH, lowPoint, atmPressure_hpa);} else {maxPoint = updatePotentio_bar(PinPotentioH, lowPoint, atmPressure_bar);}
     if (Unite == "hPa") {lcd.print(dtostrf(maxPoint, 4, 0, outstr));} else {lcd.print(dtostrf(maxPoint, 5, 3, outstr));}
     lcd.print(" ");
     lcd.print(Unite);
-    lcd.setCursor(13, 2);
-    lcd.print("lim max");
-    lcd.setCursor(13, 3);
-    if (Unite == "hPa") {lcd.print("x"); lcd.write(byte(6)); lcd.print(atmPressure_hpa);} else {lcd.print("x"); lcd.write(byte(6)); lcd.print(atmPressure_bar);};
     delay(100);
 
   } while (digitalRead(ButtonValidation) == HIGH);
@@ -393,29 +391,29 @@ void loop() {
     
     functionTestSensor (); // Test sur le capteur MPRLS
     if (Unite == "hPa") {Pressure = mpr.readPressure();} else {Pressure = (mpr.readPressure() / 1000) - atmPressure_bar;}
-    lcd.setCursor(4, 0);
+    lcd.setCursor(0, 0);
     lcd.print(Unite);
     lcd.print(" Actual:");
-    if (Unite == "hPa") {lcd.print(" "); lcd.print(int(Pressure));} else {lcd.print(dtostrf(Pressure, 5, 2, outstr));}
-    lcd.print(" "); // Efface le reste de la ligne (update)
+    if (Unite == "hPa") {lcd.print(" "); lcd.print(Pressure);} else {lcd.print(dtostrf(Pressure, 5, 2, outstr));}
+    //lcd.print(" "); // Efface le reste de la ligne
     if (Pressure >= maxPoint) {                                           // En fonction (700hpa)
       
-      lcd.setCursor(10, 1);
+      lcd.setCursor(6, 1);
       lcd.print("Next:");
-      if (Unite == "hPa") {lcd.print(" "); lcd.print(int(lowPoint));} else {lcd.print(dtostrf(lowPoint, 5, 2, outstr));}
-      lcd.print("   "); // Efface le reste de la ligne (update)
+      if (Unite == "hPa") {lcd.print(" "); lcd.print(lowPoint);} else {lcd.print(dtostrf(lowPoint, 5, 3, outstr));}
+      //lcd.print("   "); // Efface le reste de la ligne
       time_now = millis();
       if (Starting1 == 1) {time_previous = time_now + time_break;}                // Verification si le moteur peut se lancer directement ou s'il doit attendre (anti-drible).
       if (time_now - time_previous >= time_break) {
 
-        updateProgressBar(time_now, time_previous, 1);
+        updateProgressBar(time_now, time_previous, 2);
         digitalWrite(LedAction, HIGH);
         digitalWrite(RelayMoteur, HIGH);
         Impulse = 1;
 
       } else {
 
-        updateProgressBar(time_now, time_previous, 1);
+        updateProgressBar(time_now, time_previous, 2);
         digitalWrite(LedAction, HIGH);                                          // Clignotement car le moteur est en phase de repos (anti-drible).
         delay(50);
         digitalWrite(LedAction, LOW);
@@ -431,16 +429,16 @@ void loop() {
         Impulse = 0;
         digitalWrite(LedAction, LOW);
         digitalWrite(RelayMoteur, LOW);
-        lcd.setCursor(10, 1);
+        lcd.setCursor(6, 1);
         lcd.print("Next:");
-        if (Unite == "hPa") {lcd.print(" "); lcd.print(int(maxPoint));} else {lcd.print(dtostrf(maxPoint, 5, 2, outstr));}
+        if (Unite == "hPa") {lcd.print(" "); lcd.print(maxPoint);} else {lcd.print(dtostrf(maxPoint, 5, 3, outstr));}
         //lcd.print("   ");
         
     }
 
     if (Impulse == 0) {                                                       // Entre les deux valeurs !
       
-      updateProgressBar(millis(), time_now, 1);
+      updateProgressBar(millis(), time_now, 2);
 
     } else {
 
@@ -450,7 +448,7 @@ void loop() {
     }
 
     delay(frameRate);
-
+    
   }
 
 }
